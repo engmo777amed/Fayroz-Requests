@@ -15,6 +15,7 @@ class FayrozRepository(private val database: FayrozDatabase) {
     val projects: Flow<List<ProjectEntity>> = dao.observeProjects()
     val categories: Flow<List<CategoryEntity>> = dao.observeCategories()
     val items: Flow<List<ItemEntity>> = dao.observeItems()
+    val categoryBrands: Flow<List<CategoryBrandEntity>> = dao.observeCategoryBrands()
     val requestBrands: Flow<List<String>> = dao.observeRequestBrands()
     val sheetSummaries: Flow<List<RequestSheetSummary>> = dao.observeSheetSummaries()
     val suppliers: Flow<List<SupplierEntity>> = dao.observeSuppliers()
@@ -28,6 +29,17 @@ class FayrozRepository(private val database: FayrozDatabase) {
             )
         )
     }
+
+    suspend fun addProject(project: ProjectEntity): Long = dao.insertProject(
+        project.copy(
+            name = project.name.trim(),
+            clientName = project.clientName.trim(),
+            location = project.location.trim(),
+            projectType = project.projectType.trim(),
+            projectStatus = project.projectStatus.trim(),
+            notes = project.notes.trim(),
+        )
+    )
 
     suspend fun updateProject(project: ProjectEntity) = dao.updateProject(project)
     suspend fun deleteProject(project: ProjectEntity) = dao.deleteProject(project)
@@ -67,6 +79,30 @@ class FayrozRepository(private val database: FayrozDatabase) {
                 )
             }
         }
+    }
+
+    suspend fun ensureStarterBrands() = database.withTransaction {
+        StarterCatalog.categories.forEach { categoryName ->
+            val category = dao.findCategoryByName(categoryName) ?: return@forEach
+            BrandCatalog.byCategory[categoryName].orEmpty().forEach { brandName ->
+                if (dao.findCategoryBrand(category.id, brandName) == null) {
+                    dao.insertCategoryBrand(
+                        CategoryBrandEntity(
+                            categoryId = category.id,
+                            name = brandName,
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    suspend fun addCategoryBrand(categoryId: Long, name: String): Long {
+        val clean = name.trim()
+        if (clean.isBlank()) return 0L
+        val existing = dao.findCategoryBrand(categoryId, clean)
+        if (existing != null) return existing.id
+        return dao.insertCategoryBrand(CategoryBrandEntity(categoryId = categoryId, name = clean))
     }
 
     suspend fun addItem(
@@ -177,6 +213,90 @@ class FayrozRepository(private val database: FayrozDatabase) {
 
     suspend fun getItem(itemId: Long): ItemEntity? = dao.getItem(itemId)
     suspend fun getPriceList(priceListId: Long): PriceListEntity? = dao.getPriceList(priceListId)
+    suspend fun getSheet(sheetId: Long): RequestSheetEntity? = dao.getSheet(sheetId)
+    suspend fun getProject(projectId: Long): ProjectEntity? = dao.getProject(projectId)
+
+    fun pricingCopies(sheetId: Long): Flow<List<PricingCopySummary>> = dao.observePricingCopies(sheetId)
+
+    suspend fun createPricingCopy(
+        sheetId: Long,
+        placeName: String,
+        notes: String = "",
+    ): Long = database.withTransaction {
+        val cleanPlace = placeName.trim()
+        require(cleanPlace.isNotBlank()) { "اسم المكان أو المورد مطلوب" }
+        val sheet = dao.getSheet(sheetId) ?: error("الكشف غير موجود")
+        val copyId = dao.insertPricingCopy(
+            PricingCopyEntity(
+                sheetId = sheet.id,
+                placeName = cleanPlace,
+                notes = notes.trim(),
+            )
+        )
+        val lines = dao.getRequestLineDetails(sheetId)
+        dao.insertPricingCopyLines(
+            lines.map { line ->
+                PricingCopyLineEntity(
+                    copyId = copyId,
+                    requestLineId = line.lineId,
+                )
+            }
+        )
+        copyId
+    }
+
+    suspend fun deletePricingCopy(copyId: Long) {
+        dao.getPricingCopy(copyId)?.let { dao.deletePricingCopy(it) }
+    }
+
+    suspend fun loadPricingCopyDetail(copyId: Long): PricingCopyDetail? {
+        val copy = dao.getPricingCopy(copyId) ?: return null
+        val sheet = dao.getSheet(copy.sheetId) ?: return null
+        val project = dao.getProject(sheet.projectId) ?: return null
+        return PricingCopyDetail(
+            copy = copy,
+            sheet = sheet,
+            project = project,
+            lines = dao.getPricingCopyLineDetails(copyId),
+        )
+    }
+
+    suspend fun updatePricingCopyLine(
+        copyId: Long,
+        requestLineId: Long,
+        brand: String,
+        unitPrice: Double?,
+    ) = database.withTransaction {
+        val current = dao.getPricingCopyLine(copyId, requestLineId)
+        val safePrice = unitPrice?.coerceAtLeast(0.0)
+        if (current == null) {
+            dao.insertPricingCopyLines(
+                listOf(
+                    PricingCopyLineEntity(
+                        copyId = copyId,
+                        requestLineId = requestLineId,
+                        brand = brand.trim(),
+                        unitPrice = safePrice,
+                    )
+                )
+            )
+        } else {
+            dao.updatePricingCopyLine(
+                current.copy(
+                    brand = brand.trim(),
+                    unitPrice = safePrice,
+                )
+            )
+        }
+    }
+
+    suspend fun loadPricingCopiesComparison(sheetId: Long): PricingCopiesComparison? {
+        val sheet = dao.getSheet(sheetId) ?: return null
+        val project = dao.getProject(sheet.projectId) ?: return null
+        val summaries = kotlinx.coroutines.flow.first(dao.observePricingCopies(sheetId))
+        val copies = summaries.mapNotNull { loadPricingCopyDetail(it.copyId) }
+        return PricingCopiesComparison(sheet, project, copies)
+    }
 
     suspend fun addPriceList(
         supplierId: Long,
