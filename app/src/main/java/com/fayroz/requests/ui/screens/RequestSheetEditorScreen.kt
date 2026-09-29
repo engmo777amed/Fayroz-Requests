@@ -351,7 +351,7 @@ fun RequestSheetEditorScreen(
 
     if (multiPickerOpen) {
         MultiSelectItemPickerDialog(
-            items = items,
+            catalogItems = items,
             categories = categories,
             onDismiss = { multiPickerOpen = false },
             onAdd = { selectedItems ->
@@ -492,7 +492,7 @@ private fun BrandPickerField(
 
 @Composable
 private fun MultiSelectItemPickerDialog(
-    items: List<ItemEntity>,
+    catalogItems: List<ItemEntity>,
     categories: List<CategoryEntity>,
     onDismiss: () -> Unit,
     onAdd: (List<ItemEntity>) -> Unit,
@@ -501,8 +501,8 @@ private fun MultiSelectItemPickerDialog(
     var selectedCategoryId by remember { mutableStateOf<Long?>(null) }
     val selectedIds = remember { mutableStateListOf<Long>() }
 
-    val filtered = remember(items, query, selectedCategoryId) {
-        items.filter { item ->
+    val filtered = remember(catalogItems, query, selectedCategoryId) {
+        catalogItems.filter { item ->
             val categoryMatches = selectedCategoryId == null || item.categoryId == selectedCategoryId
             val queryMatches = query.isBlank() ||
                 item.name.contains(query, true) ||
@@ -652,7 +652,7 @@ private fun MultiSelectItemPickerDialog(
                         Button(
                             onClick = {
                                 val selected = selectedIds.mapNotNull { id ->
-                                    items.firstOrNull { it.id == id }
+                                    catalogItems.firstOrNull { it.id == id }
                                 }
                                 onAdd(selected)
                             },
