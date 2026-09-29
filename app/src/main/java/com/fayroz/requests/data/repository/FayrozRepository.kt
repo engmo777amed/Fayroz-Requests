@@ -39,6 +39,8 @@ class FayrozRepository(private val database: FayrozDatabase) {
             categoryIds[categoryName] = id
         }
 
+        categoryIds["أخرى"]?.let { dao.assignUncategorizedItems(it) }
+
         StarterCatalog.items.forEach { starter ->
             val normalized = ImportText.normalizeItemName(starter.name)
             if (dao.findItemByNormalizedName(normalized) == null) {
@@ -576,11 +578,14 @@ class FayrozRepository(private val database: FayrozDatabase) {
         val existing = dao.findItemByNormalizedName(normalized)
         if (existing != null) return existing.id
 
+        val fallbackCategoryId = dao.findCategoryByName("أخرى")?.id
+            ?: dao.insertCategory(CategoryEntity(name = "أخرى"))
         return dao.insertItem(
             ItemEntity(
                 code = generateItemCode(),
                 name = line.itemName.trim(),
                 normalizedName = normalized,
+                categoryId = fallbackCategoryId,
                 defaultUnit = line.unit.trim(),
             )
         )
