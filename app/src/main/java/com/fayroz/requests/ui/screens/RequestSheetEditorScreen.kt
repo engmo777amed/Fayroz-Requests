@@ -434,8 +434,8 @@ private fun RequestLineEditorCard(
                 value = line.usage,
                 onValueChange = { onChange(line.copy(usage = it)) },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("مكان الاستخدام") },
-                placeholder = { Text("مثال: حمام ماستر / مطبخ / غرفة أطفال") },
+                label = { Text("مكان الاستخدام (اختياري)") },
+                placeholder = { Text("مثال: حمام / مطبخ — أو سيبه فاضي") },
                 singleLine = true,
             )
         }
