@@ -27,10 +27,17 @@ fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}
     var message by remember { mutableStateOf<String?>(null) }
     var query by remember { mutableStateOf("") }
 
-    val categoryById = remember(categories) { categories.associateBy { it.id } }
-    val filtered = remember(allItems, query, categoryById) {
-        if (query.isBlank()) allItems
-        else allItems.filter { item ->
+    val visibleCategories = remember(categories) {
+        categories.filterNot { it.name in com.fayroz.requests.data.repository.StarterCatalog.hiddenCategories }
+    }
+    val visibleCategoryIds = remember(visibleCategories) { visibleCategories.map { it.id }.toSet() }
+    val visibleItems = remember(allItems, visibleCategoryIds) {
+        allItems.filter { it.categoryId == null || it.categoryId in visibleCategoryIds }
+    }
+    val categoryById = remember(visibleCategories) { visibleCategories.associateBy { it.id } }
+    val filtered = remember(visibleItems, query, categoryById) {
+        if (query.isBlank()) visibleItems
+        else visibleItems.filter { item ->
             val categoryName = item.categoryId?.let { categoryById[it]?.name }.orEmpty()
             item.name.contains(query, true) ||
                 item.code.contains(query, true) ||
@@ -40,9 +47,9 @@ fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}
         }
     }
 
-    val groupedItems = remember(filtered, categories) {
+    val groupedItems = remember(filtered, visibleCategories) {
         buildList {
-            categories.forEach { category ->
+            visibleCategories.forEach { category ->
                 val group = filtered.filter { it.categoryId == category.id }
                 if (group.isNotEmpty()) add(category.name to group)
             }
@@ -169,7 +176,7 @@ fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}
         ItemEditorDialog(
             title = "إضافة صنف",
             item = null,
-            categories = categories,
+            categories = visibleCategories,
             onDismiss = { showAdd = false },
             onSave = { name, unit, brand, specification, categoryId ->
                 scope.launch {
