@@ -2,6 +2,8 @@ package com.fayroz.requests.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -12,12 +14,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.fayroz.requests.data.model.CategoryEntity
 import com.fayroz.requests.data.model.ItemEntity
 import com.fayroz.requests.data.model.ProjectEntity
 import com.fayroz.requests.data.model.RequestLineDraft
 import com.fayroz.requests.data.model.RequestSheetDraft
 import com.fayroz.requests.data.repository.FayrozRepository
+import com.fayroz.requests.data.repository.StarterCatalog
 import kotlinx.coroutines.launch
 
 private data class EditableLineUi(
@@ -27,6 +32,7 @@ private data class EditableLineUi(
     val itemName: String = "",
     val quantity: String = "",
     val unit: String = "",
+    val brand: String = "",
     val usage: String = "",
     val description: String = "",
     val notes: String = "",
@@ -41,9 +47,20 @@ fun RequestSheetEditorScreen(
     onOpenProjects: () -> Unit,
 ) {
     val projects by repository.projects.collectAsState(initial = emptyList())
-    val categories by repository.categories.collectAsState(initial = emptyList())
-    val items by repository.items.collectAsState(initial = emptyList())
+    val allCategories by repository.categories.collectAsState(initial = emptyList())
+    val allItems by repository.items.collectAsState(initial = emptyList())
+    val rememberedBrands by repository.requestBrands.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
+
+    val categories = remember(allCategories) {
+        allCategories.filterNot { it.name in StarterCatalog.hiddenCategories }
+    }
+    val visibleCategoryIds = remember(categories) { categories.map { it.id }.toSet() }
+    val items = remember(allItems, visibleCategoryIds) {
+        allItems.filter { it.categoryId == null || it.categoryId in visibleCategoryIds }
+    }
+    val itemById = remember(items) { items.associateBy { it.id } }
+    val categoryById = remember(categories) { categories.associateBy { it.id } }
 
     var selectedProjectId by remember { mutableStateOf<Long?>(null) }
     var sheetNumber by remember { mutableStateOf("") }
@@ -55,13 +72,8 @@ fun RequestSheetEditorScreen(
     var isSaving by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var projectPickerOpen by remember { mutableStateOf(false) }
-    var itemPickerIndex by remember { mutableStateOf<Int?>(null) }
+    var multiPickerOpen by remember { mutableStateOf(false) }
     val lines = remember { mutableStateListOf<EditableLineUi>() }
-
-    fun addBlankLine() {
-        val nextId = (lines.maxOfOrNull { it.localId } ?: 0L) + 1L
-        lines.add(EditableLineUi(localId = nextId))
-    }
 
     LaunchedEffect(sheetId) {
         if (sheetId != null) {
@@ -80,24 +92,21 @@ fun RequestSheetEditorScreen(
                     lines.add(
                         EditableLineUi(
                             localId = index.toLong() + 1,
-                            categoryId = items.firstOrNull { it.id == line.existingItemId }?.categoryId,
+                            categoryId = allItems.firstOrNull { it.id == line.existingItemId }?.categoryId,
                             existingItemId = line.existingItemId,
                             itemName = line.itemName,
                             quantity = formatQuantity(line.quantity),
                             unit = line.unit,
+                            brand = line.brand,
                             usage = line.usage,
                             description = line.lineDescription,
                             notes = line.notes,
                         )
                     )
                 }
-                if (lines.isEmpty()) addBlankLine()
             }
-            isLoading = false
-        } else {
-            if (lines.isEmpty()) addBlankLine()
-            isLoading = false
         }
+        isLoading = false
     }
 
     LaunchedEffect(items) {
@@ -105,8 +114,7 @@ fun RequestSheetEditorScreen(
             lines.indices.forEach { index ->
                 val line = lines[index]
                 if (line.categoryId == null && line.existingItemId != null) {
-                    val categoryId = items.firstOrNull { it.id == line.existingItemId }?.categoryId
-                    if (categoryId != null) {
+                    itemById[line.existingItemId]?.categoryId?.let { categoryId ->
                         lines[index] = line.copy(categoryId = categoryId)
                     }
                 }
@@ -123,7 +131,9 @@ fun RequestSheetEditorScreen(
     }
 
     if (isLoading) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
         return
     }
 
@@ -133,11 +143,16 @@ fun RequestSheetEditorScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            Icon(Icons.Outlined.Business, null, modifier = Modifier.size(60.dp), tint = MaterialTheme.colorScheme.secondary)
+            Icon(
+                Icons.Outlined.Business,
+                null,
+                modifier = Modifier.size(60.dp),
+                tint = MaterialTheme.colorScheme.secondary,
+            )
             Spacer(Modifier.height(14.dp))
             Text("أضف مشروعًا أولًا", style = MaterialTheme.typography.headlineSmall)
             Spacer(Modifier.height(6.dp))
-            Text("كل كشف طلبات يجب أن يتبع مشروعًا.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("كل كشف طلبات لازم يتبع مشروع.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(18.dp))
             Button(onClick = onOpenProjects) { Text("فتح المشروعات") }
             TextButton(onClick = onCancel) { Text("رجوع") }
@@ -150,39 +165,52 @@ fun RequestSheetEditorScreen(
             Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(onClick = onCancel) { Icon(Icons.Outlined.ArrowForward, "رجوع") }
+            IconButton(onClick = onCancel) {
+                Icon(Icons.Outlined.ArrowForward, "رجوع")
+            }
             Column(Modifier.weight(1f)) {
-                Text(if (sheetId == null) "كشف طلبات جديد" else "تعديل كشف الطلبات", style = MaterialTheme.typography.titleLarge)
-                Text("أدخل الكشف كما وصلك من الصنايعي", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    if (sheetId == null) "كشف طلبات جديد" else "تعديل كشف الطلبات",
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                Text(
+                    if (lines.isEmpty()) "اختار الأصناف مرة واحدة وبعدها كمل الكميات والماركات"
+                    else "${lines.size} صنف في الكشف",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             Button(
                 onClick = {
-                    val validation = validateSheet(selectedProjectId, sheetNumber, lines)
+                    val validation = validateSheet(selectedProjectId, lines)
                     errorMessage = validation
                     val projectId = selectedProjectId
                     if (validation == null && projectId != null) {
-                        val validLines = lines.filter { it.existingItemId != null && (it.quantity.toDoubleOrNull() ?: 0.0) > 0 }
                         scope.launch {
                             isSaving = true
                             runCatching {
+                                val finalSheetNumber = sheetNumber.ifBlank {
+                                    repository.suggestedSheetNumber(projectId)
+                                }
                                 repository.saveSheet(
                                     RequestSheetDraft(
                                         id = sheetId ?: 0L,
                                         projectId = projectId,
-                                        sheetNumber = sheetNumber,
+                                        sheetNumber = finalSheetNumber,
                                         sheetDate = sheetDate,
                                         trade = trade,
-                                        craftsmanName = craftsmanName,
+                                        craftsmanName = craftsmanName.trim(),
                                         notes = notes,
-                                        lines = validLines.map {
+                                        lines = lines.map { line ->
                                             RequestLineDraft(
-                                                existingItemId = it.existingItemId,
-                                                itemName = it.itemName,
-                                                quantity = it.quantity.toDouble(),
-                                                unit = it.unit,
-                                                usage = it.usage,
-                                                lineDescription = it.description,
-                                                notes = it.notes,
+                                                existingItemId = line.existingItemId,
+                                                itemName = line.itemName,
+                                                quantity = line.quantity.toDouble(),
+                                                unit = line.unit,
+                                                brand = line.brand.trim(),
+                                                usage = line.usage.trim(),
+                                                lineDescription = line.description,
+                                                notes = line.notes,
                                             )
                                         },
                                     )
@@ -190,11 +218,7 @@ fun RequestSheetEditorScreen(
                             }.onSuccess {
                                 onDone()
                             }.onFailure {
-                                errorMessage = if (it.message?.contains("UNIQUE", true) == true) {
-                                    "رقم الكشف مستخدم بالفعل داخل هذا المشروع. غيّر رقم الكشف."
-                                } else {
-                                    "تعذر حفظ الكشف: ${it.message ?: "خطأ غير معروف"}"
-                                }
+                                errorMessage = "تعذر حفظ الكشف: ${it.message ?: "خطأ غير معروف"}"
                             }
                             isSaving = false
                         }
@@ -216,92 +240,96 @@ fun RequestSheetEditorScreen(
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(18.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            contentPadding = PaddingValues(14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
                 Card {
-                    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("بيانات الكشف", style = MaterialTheme.typography.titleMedium)
+                    Column(
+                        Modifier.fillMaxWidth().padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
                         val project = projects.firstOrNull { it.id == selectedProjectId }
-                        OutlinedButton(onClick = { projectPickerOpen = true }, modifier = Modifier.fillMaxWidth()) {
+                        OutlinedButton(
+                            onClick = { projectPickerOpen = true },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
                             Icon(Icons.Outlined.Business, null)
                             Spacer(Modifier.width(8.dp))
-                            Text(project?.name ?: "اختيار المشروع")
-                            Spacer(Modifier.weight(1f))
+                            Text(project?.name ?: "اختيار المشروع", modifier = Modifier.weight(1f))
                             Icon(Icons.Outlined.KeyboardArrowDown, null)
                         }
+
                         OutlinedTextField(
-                            sheetNumber,
-                            { sheetNumber = it },
+                            value = craftsmanName,
+                            onValueChange = { craftsmanName = it },
                             modifier = Modifier.fillMaxWidth(),
-                            label = { Text("رقم الكشف *") },
+                            label = { Text("اسم الصنايعي / اللي باعت الطلب") },
                             singleLine = true,
-                        )
-                        OutlinedTextField(
-                            trade,
-                            { trade = it },
-                            modifier = Modifier.fillMaxWidth(),
-                            label = { Text("التخصص / نوع الشغل") },
-                            placeholder = { Text("كهرباء، سباكة، نجارة...") },
-                            singleLine = true,
-                        )
-                        OutlinedTextField(
-                            craftsmanName,
-                            { craftsmanName = it },
-                            modifier = Modifier.fillMaxWidth(),
-                            label = { Text("اسم الصنايعي") },
-                            singleLine = true,
-                        )
-                        OutlinedTextField(
-                            notes,
-                            { notes = it },
-                            modifier = Modifier.fillMaxWidth(),
-                            label = { Text("ملاحظات الكشف") },
-                            minLines = 2,
                         )
                     }
                 }
             }
 
             item {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("بنود الكشف", style = MaterialTheme.typography.titleLarge)
-                        Text("اختار القسم ثم الصنف، والوحدة تتحدد تلقائيًا", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    FilledTonalButton(onClick = { addBlankLine() }) {
-                        Icon(Icons.Outlined.Add, null)
-                        Spacer(Modifier.width(5.dp))
-                        Text("بند")
-                    }
+                Button(
+                    onClick = { multiPickerOpen = true },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Outlined.PlaylistAdd, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (lines.isEmpty()) "اختيار الأصناف" else "إضافة أصناف أخرى")
                 }
             }
 
-            itemsIndexed(lines, key = { _, line -> line.localId }) { index, line ->
-                RequestLineEditorCard(
-                    index = index,
-                    line = line,
-                    categories = categories,
-                    onChange = { lines[index] = it },
-                    onPickItem = { if (line.categoryId != null) itemPickerIndex = index },
-                    onDelete = { if (lines.size > 1) lines.removeAt(index) else lines[index] = EditableLineUi(localId = line.localId) },
-                )
+            if (lines.isEmpty()) {
+                item {
+                    EmptyState(
+                        Icons.Outlined.PlaylistAdd,
+                        "لسه مفيش أصناف",
+                        "اضغط «اختيار الأصناف» وحدد كل المطلوب مرة واحدة.",
+                    )
+                }
+            } else {
+                itemsIndexed(lines, key = { _, line -> line.localId }) { index, line ->
+                    val item = line.existingItemId?.let(itemById::get)
+                    val categoryName = line.categoryId?.let { categoryById[it]?.name }.orEmpty()
+                    RequestLineEditorCard(
+                        index = index,
+                        line = line,
+                        item = item,
+                        brandSuggestions = (
+                            commonBrandSuggestions(categoryName) + rememberedBrands
+                        ).distinct(),
+                        onChange = { lines[index] = it },
+                        onDelete = { lines.removeAt(index) },
+                    )
+                }
             }
 
             errorMessage?.let { message ->
                 item {
-                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
-                        Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Outlined.ErrorOutline, null, tint = MaterialTheme.colorScheme.onErrorContainer)
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                        )
+                    ) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(Icons.Outlined.ErrorOutline, null)
                             Spacer(Modifier.width(8.dp))
-                            Text(message, color = MaterialTheme.colorScheme.onErrorContainer, style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                message,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                            )
                         }
                     }
                 }
             }
 
-            item { Spacer(Modifier.height(32.dp)) }
+            item { Spacer(Modifier.height(24.dp)) }
         }
     }
 
@@ -313,30 +341,35 @@ fun RequestSheetEditorScreen(
                 selectedProjectId = project.id
                 projectPickerOpen = false
                 if (sheetId == null) {
-                    scope.launch { sheetNumber = repository.suggestedSheetNumber(project.id) }
+                    scope.launch {
+                        sheetNumber = repository.suggestedSheetNumber(project.id)
+                    }
                 }
             },
         )
     }
 
-    itemPickerIndex?.let { lineIndex ->
-        if (lineIndex in lines.indices) {
-            ItemPickerDialog(
-                items = items.filter { it.categoryId == lines[lineIndex].categoryId },
-                categories = categories,
-                onDismiss = { itemPickerIndex = null },
-                onSelect = { item ->
-                    val current = lines[lineIndex]
-                    lines[lineIndex] = current.copy(
-                        categoryId = item.categoryId,
-                        existingItemId = item.id,
-                        itemName = item.name,
-                        unit = item.defaultUnit,
+    if (multiPickerOpen) {
+        MultiSelectItemPickerDialog(
+            items = items,
+            categories = categories,
+            onDismiss = { multiPickerOpen = false },
+            onAdd = { selectedItems ->
+                var nextId = (lines.maxOfOrNull { it.localId } ?: 0L) + 1L
+                selectedItems.forEach { item ->
+                    lines.add(
+                        EditableLineUi(
+                            localId = nextId++,
+                            categoryId = item.categoryId,
+                            existingItemId = item.id,
+                            itemName = item.name,
+                            unit = item.defaultUnit,
+                        )
                     )
-                    itemPickerIndex = null
-                },
-            )
-        }
+                }
+                multiPickerOpen = false
+            },
+        )
     }
 }
 
@@ -344,94 +377,35 @@ fun RequestSheetEditorScreen(
 private fun RequestLineEditorCard(
     index: Int,
     line: EditableLineUi,
-    categories: List<CategoryEntity>,
+    item: ItemEntity?,
+    brandSuggestions: List<String>,
     onChange: (EditableLineUi) -> Unit,
-    onPickItem: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    var categoryMenuOpen by remember(line.localId) { mutableStateOf(false) }
-    val selectedCategory = categories.firstOrNull { it.id == line.categoryId }
-
     Card {
         Column(
-            Modifier.fillMaxWidth().padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            Modifier.fillMaxWidth().padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(9.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "بند ${index + 1}",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f),
-                )
-                IconButton(onClick = onDelete) {
-                    Icon(Icons.Outlined.DeleteOutline, "حذف البند")
-                }
-            }
-
-            Box(Modifier.fillMaxWidth()) {
-                OutlinedButton(
-                    onClick = { categoryMenuOpen = true },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Icon(Icons.Outlined.Category, null)
-                    Spacer(Modifier.width(8.dp))
+            Row(verticalAlignment = Alignment.Top) {
+                Column(Modifier.weight(1f)) {
                     Text(
-                        selectedCategory?.name ?: "اختيار القسم *",
-                        modifier = Modifier.weight(1f),
+                        "${index + 1}. ${line.itemName}",
+                        style = MaterialTheme.typography.titleMedium,
                     )
-                    Icon(Icons.Outlined.KeyboardArrowDown, null)
+                    item?.specification
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let {
+                            Text(
+                                it,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                 }
-                DropdownMenu(
-                    expanded = categoryMenuOpen,
-                    onDismissRequest = { categoryMenuOpen = false },
-                ) {
-                    categories.forEach { category ->
-                        DropdownMenuItem(
-                            text = { Text(category.name) },
-                            onClick = {
-                                categoryMenuOpen = false
-                                if (line.categoryId != category.id) {
-                                    onChange(
-                                        line.copy(
-                                            categoryId = category.id,
-                                            existingItemId = null,
-                                            itemName = "",
-                                            unit = "",
-                                        )
-                                    )
-                                }
-                            },
-                        )
-                    }
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Outlined.DeleteOutline, "حذف الصنف")
                 }
-            }
-
-            OutlinedButton(
-                onClick = onPickItem,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = line.categoryId != null,
-            ) {
-                Icon(Icons.Outlined.Inventory2, null)
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    if (line.existingItemId == null) "اختيار الصنف *" else line.itemName,
-                    modifier = Modifier.weight(1f),
-                )
-                Icon(Icons.Outlined.KeyboardArrowDown, null)
-            }
-
-            if (line.categoryId == null) {
-                Text(
-                    "اختار القسم الأول، وبعدها هتظهر أصناف القسم.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else if (line.existingItemId != null) {
-                Text(
-                    "الوحدة: ${line.unit}",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                )
             }
 
             OutlinedTextField(
@@ -443,31 +417,254 @@ private fun RequestLineEditorCard(
                 },
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("الكمية *") },
-                placeholder = { Text("أدخل الكمية") },
                 suffix = {
                     if (line.unit.isNotBlank()) Text(line.unit)
                 },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 singleLine = true,
-                enabled = line.existingItemId != null,
+            )
+
+            BrandPickerField(
+                value = line.brand,
+                suggestions = brandSuggestions,
+                onValueChange = { onChange(line.copy(brand = it)) },
             )
 
             OutlinedTextField(
                 value = line.usage,
                 onValueChange = { onChange(line.copy(usage = it)) },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("ده لإيه / مكان الاستخدام") },
-                placeholder = { Text("مثال: تأسيس كهرباء الدور الأول") },
+                label = { Text("مكان الاستخدام") },
+                placeholder = { Text("مثال: حمام ماستر / مطبخ / غرفة أطفال") },
                 singleLine = true,
             )
+        }
+    }
+}
 
-            OutlinedTextField(
-                value = line.description,
-                onValueChange = { onChange(line.copy(description = it)) },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("وصف أو مواصفة إضافية") },
-                singleLine = true,
-            )
+@Composable
+private fun BrandPickerField(
+    value: String,
+    suggestions: List<String>,
+    onValueChange: (String) -> Unit,
+) {
+    var menuOpen by remember { mutableStateOf(false) }
+    val filtered = remember(value, suggestions) {
+        suggestions
+            .filter { value.isBlank() || it.contains(value, ignoreCase = true) }
+            .take(12)
+    }
+
+    Box(Modifier.fillMaxWidth()) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = {
+                onValueChange(it)
+                menuOpen = true
+            },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("الماركة") },
+            placeholder = { Text("اختار أو اكتب الماركة") },
+            trailingIcon = {
+                IconButton(onClick = { menuOpen = true }) {
+                    Icon(Icons.Outlined.KeyboardArrowDown, "اختيار الماركة")
+                }
+            },
+            singleLine = true,
+        )
+
+        DropdownMenu(
+            expanded = menuOpen && filtered.isNotEmpty(),
+            onDismissRequest = { menuOpen = false },
+        ) {
+            filtered.forEach { brand ->
+                DropdownMenuItem(
+                    text = { Text(brand) },
+                    onClick = {
+                        onValueChange(brand)
+                        menuOpen = false
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MultiSelectItemPickerDialog(
+    items: List<ItemEntity>,
+    categories: List<CategoryEntity>,
+    onDismiss: () -> Unit,
+    onAdd: (List<ItemEntity>) -> Unit,
+) {
+    var query by remember { mutableStateOf("") }
+    var selectedCategoryId by remember { mutableStateOf<Long?>(null) }
+    val selectedIds = remember { mutableStateListOf<Long>() }
+
+    val filtered = remember(items, query, selectedCategoryId) {
+        items.filter { item ->
+            val categoryMatches = selectedCategoryId == null || item.categoryId == selectedCategoryId
+            val queryMatches = query.isBlank() ||
+                item.name.contains(query, true) ||
+                item.code.contains(query, true) ||
+                item.specification.contains(query, true)
+            categoryMatches && queryMatches
+        }
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(8.dp),
+            shape = MaterialTheme.shapes.large,
+            tonalElevation = 6.dp,
+        ) {
+            Column(Modifier.fillMaxSize()) {
+                Row(
+                    Modifier.fillMaxWidth().padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Outlined.Close, "إغلاق")
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Text("اختيار الأصناف", style = MaterialTheme.typography.titleLarge)
+                        Text(
+                            "حدد أي عدد من الأصناف ثم أضفهم للكشف",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (selectedIds.isNotEmpty()) {
+                        Badge { Text(selectedIds.size.toString()) }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp),
+                    label = { Text("بحث باسم الصنف أو اسم الصنايعي") },
+                    leadingIcon = { Icon(Icons.Outlined.Search, null) },
+                    singleLine = true,
+                )
+
+                Spacer(Modifier.height(8.dp))
+
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    item {
+                        FilterChip(
+                            selected = selectedCategoryId == null,
+                            onClick = { selectedCategoryId = null },
+                            label = { Text("الكل") },
+                        )
+                    }
+                    items(categories, key = { it.id }) { category ->
+                        FilterChip(
+                            selected = selectedCategoryId == category.id,
+                            onClick = { selectedCategoryId = category.id },
+                            label = { Text(category.name) },
+                        )
+                    }
+                }
+
+                HorizontalDivider(Modifier.padding(top = 8.dp))
+
+                if (filtered.isEmpty()) {
+                    Box(
+                        Modifier.weight(1f).fillMaxWidth(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("مفيش أصناف مطابقة للبحث.")
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        items(filtered, key = { it.id }) { item ->
+                            val checked = item.id in selectedIds
+                            Card(
+                                onClick = {
+                                    if (checked) selectedIds.remove(item.id)
+                                    else selectedIds.add(item.id)
+                                },
+                                colors = if (checked) {
+                                    CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                    )
+                                } else {
+                                    CardDefaults.cardColors()
+                                },
+                            ) {
+                                Row(
+                                    Modifier.fillMaxWidth().padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Checkbox(
+                                        checked = checked,
+                                        onCheckedChange = {
+                                            if (checked) selectedIds.remove(item.id)
+                                            else selectedIds.add(item.id)
+                                        },
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Column(Modifier.weight(1f)) {
+                                        Text(item.name, style = MaterialTheme.typography.titleSmall)
+                                        if (item.specification.isNotBlank()) {
+                                            Text(
+                                                item.specification,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                    }
+                                    Text(
+                                        item.defaultUnit,
+                                        style = MaterialTheme.typography.labelMedium,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Surface(tonalElevation = 2.dp) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            "المحدد: ${selectedIds.size}",
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.titleSmall,
+                        )
+                        Button(
+                            onClick = {
+                                val selected = selectedIds.mapNotNull { id ->
+                                    items.firstOrNull { it.id == id }
+                                }
+                                onAdd(selected)
+                            },
+                            enabled = selectedIds.isNotEmpty(),
+                        ) {
+                            Icon(Icons.Outlined.AddTask, null)
+                            Spacer(Modifier.width(6.dp))
+                            Text("إضافة للكشف")
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -482,80 +679,19 @@ private fun ProjectPickerDialog(
         onDismissRequest = onDismiss,
         title = { Text("اختيار المشروع") },
         text = {
-            LazyColumn(Modifier.heightIn(max = 420.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                itemsIndexed(projects, key = { _, item -> item.id }) { _, project ->
+            LazyColumn(
+                Modifier.heightIn(max = 420.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                items(projects, key = { it.id }) { project ->
                     Card(onClick = { onSelect(project) }) {
                         Column(Modifier.fillMaxWidth().padding(12.dp)) {
                             Text(project.name, style = MaterialTheme.typography.titleMedium)
-                            if (project.location.isNotBlank()) Text(project.location, style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } },
-    )
-}
-
-@Composable
-private fun ItemPickerDialog(
-    items: List<ItemEntity>,
-    categories: List<CategoryEntity>,
-    onDismiss: () -> Unit,
-    onSelect: (ItemEntity) -> Unit,
-) {
-    var query by remember { mutableStateOf("") }
-
-    val filtered = remember(items, query) {
-        items.filter { item ->
-            query.isBlank() ||
-                item.name.contains(query, true) ||
-                item.code.contains(query, true) ||
-                item.brand.contains(query, true) ||
-                item.specification.contains(query, true)
-        }
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("اختيار الصنف") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("بحث في الأصناف") },
-                    leadingIcon = { Icon(Icons.Outlined.Search, null) },
-                    singleLine = true,
-                )
-
-                if (filtered.isEmpty()) {
-                    Text("لا توجد أصناف مطابقة. أضف الصنف من «دليل الأصناف» ثم ارجع للكشف.")
-                } else {
-                    LazyColumn(
-                        Modifier.heightIn(max = 380.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        itemsIndexed(filtered, key = { _, item -> item.id }) { _, item ->
-                            Card(onClick = { onSelect(item) }) {
-                                Row(
-                                    Modifier.fillMaxWidth().padding(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Column(Modifier.weight(1f)) {
-                                        Text(item.name, style = MaterialTheme.typography.titleSmall)
-                                        if (item.specification.isNotBlank()) {
-                                            Text(
-                                                item.specification,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            )
-                                        }
-                                    }
-                                    Text(item.defaultUnit, style = MaterialTheme.typography.labelLarge)
-                                }
+                            if (project.location.isNotBlank()) {
+                                Text(
+                                    project.location,
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
                             }
                         }
                     }
@@ -569,19 +705,34 @@ private fun ItemPickerDialog(
     )
 }
 
-private fun validateSheet(projectId: Long?, sheetNumber: String, lines: List<EditableLineUi>): String? {
+private fun validateSheet(
+    projectId: Long?,
+    lines: List<EditableLineUi>,
+): String? {
     if (projectId == null) return "اختار المشروع أولًا."
-    if (sheetNumber.isBlank()) return "اكتب رقم الكشف."
-    val validLines = lines.filter { it.existingItemId != null || it.quantity.isNotBlank() }
-    if (validLines.isEmpty()) return "أضف بندًا واحدًا على الأقل."
-    val invalid = validLines.firstOrNull {
-        it.categoryId == null ||
-            it.existingItemId == null ||
+    if (lines.isEmpty()) return "اختار صنف واحد على الأقل."
+    val invalid = lines.firstOrNull {
+        it.existingItemId == null ||
             (it.quantity.toDoubleOrNull() ?: 0.0) <= 0.0 ||
             it.unit.isBlank()
     }
-    if (invalid != null) return "راجع البنود: اختار القسم والصنف وأدخل الكمية لكل بند."
+    if (invalid != null) return "راجع الكميات: كل صنف لازم يكون له كمية أكبر من صفر."
     return null
 }
 
-private fun formatQuantity(value: Double): String = if (value % 1.0 == 0.0) value.toLong().toString() else value.toString()
+private fun commonBrandSuggestions(categoryName: String): List<String> = when {
+    categoryName.startsWith("سباكة") -> listOf("الشريف", "أكوافلو", "BR", "باننجر")
+    categoryName == "أدوات صحية" -> listOf("Ideal Standard", "Lecico", "Grohe", "Hansgrohe", "Roca", "Duravit")
+    categoryName == "كهرباء - تأسيس" -> listOf("السويدي", "كابلات مصر")
+    categoryName == "كهرباء - لوحات وحماية" -> listOf("Schneider", "ABB", "Legrand", "Eaton", "Siemens")
+    categoryName == "كهرباء - مفاتيح وبرايز" -> listOf("Schneider", "Legrand", "BTicino", "Gewiss", "Vimar")
+    categoryName == "إضاءة" -> listOf("Philips", "Osram")
+    categoryName == "تيار خفيف وسمارت" -> listOf("Hikvision", "Dahua", "TP-Link", "Ubiquiti", "Schneider", "Legrand")
+    categoryName == "جبس بورد وأسقف" -> listOf("Knauf", "Gyproc")
+    categoryName == "دهانات" -> listOf("Jotun", "GLC", "Sipes", "Scib", "Pachin")
+    categoryName == "مواد لاصقة وكيماويات" -> listOf("Sika", "Bostik", "Pattex")
+    else -> emptyList()
+}
+
+private fun formatQuantity(value: Double): String =
+    if (value % 1.0 == 0.0) value.toLong().toString() else value.toString()
