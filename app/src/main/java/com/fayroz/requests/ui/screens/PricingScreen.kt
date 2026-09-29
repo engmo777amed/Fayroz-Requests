@@ -31,6 +31,7 @@ import java.time.format.DateTimeFormatter
 fun PricingScreen(
     repository: FayrozRepository,
     onPriceSheet: (Long) -> Unit,
+    onBack: (() -> Unit)? = null,
 ) {
     val sheets by repository.sheetSummaries.collectAsState(initial = emptyList())
     var query by remember { mutableStateOf("") }
@@ -41,8 +42,12 @@ fun PricingScreen(
         }
     }
 
-    Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        ScreenHeader("تسعير الكشوف", "اختر كشفًا وقارن آخر أسعار الموردين لكل بند")
+    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        FayrozDetailHeader(
+            title = "تسعير الكشوف",
+            subtitle = "اختر كشفًا وقارن آخر أسعار الموردين لكل بند",
+            onBack = onBack,
+        )
         Card {
             Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("قاعدة الخصم", style = MaterialTheme.typography.titleMedium)
