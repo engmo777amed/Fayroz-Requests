@@ -10,7 +10,6 @@ permissions:
 
 jobs:
   bootstrap-build:
-    if: ${{ hashFiles('bootstrap/source.b64') != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
