@@ -549,10 +549,17 @@ class FayrozRepository(private val database: FayrozDatabase) {
         }
 
         if (draft.id == 0L) {
+            // The database is the source of truth for numbering.
+            // Calculate the next number inside the same transaction that inserts the sheet,
+            // so an old UI suggestion can never create a duplicate sheet number.
+            val finalSheetNumber = (dao.maxNumericSheetNumber(draft.projectId) + 1)
+                .toString()
+                .padStart(3, '0')
+
             val newId = dao.insertSheet(
                 RequestSheetEntity(
                     projectId = draft.projectId,
-                    sheetNumber = draft.sheetNumber.trim(),
+                    sheetNumber = finalSheetNumber,
                     sheetDate = draft.sheetDate,
                     trade = draft.trade.trim(),
                     craftsmanName = draft.craftsmanName.trim(),
@@ -563,10 +570,18 @@ class FayrozRepository(private val database: FayrozDatabase) {
             newId
         } else {
             val existing = dao.getSheet(draft.id) ?: error("الكشف غير موجود")
+            val finalSheetNumber = if (existing.projectId == draft.projectId) {
+                existing.sheetNumber
+            } else {
+                (dao.maxNumericSheetNumber(draft.projectId) + 1)
+                    .toString()
+                    .padStart(3, '0')
+            }
+
             dao.updateSheet(
                 existing.copy(
                     projectId = draft.projectId,
-                    sheetNumber = draft.sheetNumber.trim(),
+                    sheetNumber = finalSheetNumber,
                     sheetDate = draft.sheetDate,
                     trade = draft.trade.trim(),
                     craftsmanName = draft.craftsmanName.trim(),
