@@ -8,6 +8,7 @@ data class RequestSheetSummary(
     val sheetDate: Long,
     val trade: String,
     val craftsmanName: String,
+    val workLocation: String,
     val notes: String,
     val lineCount: Int,
 )
@@ -43,6 +44,7 @@ data class RequestSheetDraft(
     val sheetDate: Long,
     val trade: String = "",
     val craftsmanName: String = "",
+    val workLocation: String = "",
     val notes: String = "",
     val lines: List<RequestLineDraft>,
 )
