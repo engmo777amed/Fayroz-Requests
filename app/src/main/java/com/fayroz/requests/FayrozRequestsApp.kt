@@ -10,9 +10,14 @@ class FayrozRequestsApp : Application() {
 
     suspend fun ensureStarterCatalogOnce() {
         val prefs = getSharedPreferences("fayroz_requests_setup", MODE_PRIVATE)
-        if (prefs.getBoolean("starter_catalog_v3_seeded", false)) return
+        val catalogReady = prefs.getBoolean("starter_catalog_v4_seeded", false)
 
-        repository.ensureStarterCatalog()
-        prefs.edit().putBoolean("starter_catalog_v1_seeded", true).apply()
+        if (!catalogReady || !repository.hasAnyItems()) {
+            repository.ensureStarterCatalog()
+            prefs.edit().putBoolean("starter_catalog_v4_seeded", true).apply()
+        }
+
+        // Idempotent: adds only missing brand names and preserves anything the user added.
+        repository.ensureStarterBrands()
     }
 }
