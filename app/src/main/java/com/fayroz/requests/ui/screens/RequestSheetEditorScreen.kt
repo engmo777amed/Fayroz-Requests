@@ -218,7 +218,7 @@ fun RequestSheetEditorScreen(
                             }.onSuccess {
                                 onDone()
                             }.onFailure {
-                                errorMessage = "تعذر حفظ الكشف: ${it.message ?: "خطأ غير معروف"}"
+                                errorMessage = friendlySheetSaveError(it)
                             }
                             isSaving = false
                         }
@@ -736,3 +736,19 @@ private fun commonBrandSuggestions(categoryName: String): List<String> = when {
 
 private fun formatQuantity(value: Double): String =
     if (value % 1.0 == 0.0) value.toLong().toString() else value.toString()
+
+
+private fun friendlySheetSaveError(error: Throwable): String {
+    val message = error.message.orEmpty()
+    return when {
+        message.contains("UNIQUE constraint", ignoreCase = true) ||
+            message.contains("SQLITE_CONSTRAINT_UNIQUE", ignoreCase = true) ->
+            "حصل تعارض في رقم الكشف. اقفل الرسالة واضغط حفظ مرة أخرى."
+
+        message.contains("foreign key", ignoreCase = true) ->
+            "تعذر الحفظ لأن مشروع أو صنف مرتبط بالكشف لم يعد موجودًا."
+
+        else ->
+            "تعذر حفظ الكشف. راجع البيانات وحاول مرة أخرى."
+    }
+}
