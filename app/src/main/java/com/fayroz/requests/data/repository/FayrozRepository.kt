@@ -13,6 +13,7 @@ class FayrozRepository(private val database: FayrozDatabase) {
     private val dao = database.dao()
 
     val projects: Flow<List<ProjectEntity>> = dao.observeProjects()
+    val categories: Flow<List<CategoryEntity>> = dao.observeCategories()
     val items: Flow<List<ItemEntity>> = dao.observeItems()
     val sheetSummaries: Flow<List<RequestSheetSummary>> = dao.observeSheetSummaries()
     val suppliers: Flow<List<SupplierEntity>> = dao.observeSuppliers()
@@ -30,12 +31,38 @@ class FayrozRepository(private val database: FayrozDatabase) {
     suspend fun updateProject(project: ProjectEntity) = dao.updateProject(project)
     suspend fun deleteProject(project: ProjectEntity) = dao.deleteProject(project)
 
+    suspend fun ensureStarterCatalog() = database.withTransaction {
+        val categoryIds = mutableMapOf<String, Long>()
+        StarterCatalog.categories.forEach { categoryName ->
+            val existing = dao.findCategoryByName(categoryName)
+            val id = existing?.id ?: dao.insertCategory(CategoryEntity(name = categoryName))
+            categoryIds[categoryName] = id
+        }
+
+        StarterCatalog.items.forEach { starter ->
+            val normalized = ImportText.normalizeItemName(starter.name)
+            if (dao.findItemByNormalizedName(normalized) == null) {
+                dao.insertItem(
+                    ItemEntity(
+                        code = generateItemCode(),
+                        name = starter.name,
+                        normalizedName = normalized,
+                        categoryId = categoryIds[starter.category],
+                        defaultUnit = starter.unit,
+                        specification = starter.specification,
+                    )
+                )
+            }
+        }
+    }
+
     suspend fun addItem(
         name: String,
         unit: String,
         code: String = "",
         brand: String = "",
         specification: String = "",
+        categoryId: Long? = null,
     ): Long {
         val cleanName = name.trim()
         val normalized = ImportText.normalizeItemName(cleanName)
@@ -48,6 +75,7 @@ class FayrozRepository(private val database: FayrozDatabase) {
                 code = finalCode,
                 name = cleanName,
                 normalizedName = normalized,
+                categoryId = categoryId,
                 defaultUnit = unit.trim(),
                 brand = brand.trim(),
                 specification = specification.trim(),
@@ -61,6 +89,7 @@ class FayrozRepository(private val database: FayrozDatabase) {
         unit: String,
         brand: String = "",
         specification: String = "",
+        categoryId: Long? = null,
     ): String? {
         val current = dao.getItem(itemId) ?: return "الصنف غير موجود."
         val cleanName = name.trim()
@@ -78,6 +107,7 @@ class FayrozRepository(private val database: FayrozDatabase) {
             current.copy(
                 name = cleanName,
                 normalizedName = normalized,
+                categoryId = categoryId,
                 defaultUnit = cleanUnit,
                 brand = brand.trim(),
                 specification = specification.trim(),
