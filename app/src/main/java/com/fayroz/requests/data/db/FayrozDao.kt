@@ -116,6 +116,7 @@ interface FayrozDao {
                i.code AS itemCode,
                rl.quantity AS quantity,
                rl.unit AS unit,
+               rl.brand AS brand,
                rl.usage AS usage,
                rl.lineDescription AS lineDescription,
                rl.notes AS notes
