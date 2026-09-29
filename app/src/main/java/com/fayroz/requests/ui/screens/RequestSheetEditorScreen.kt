@@ -49,7 +49,6 @@ fun RequestSheetEditorScreen(
     val projects by repository.projects.collectAsState(initial = emptyList())
     val allCategories by repository.categories.collectAsState(initial = emptyList())
     val allItems by repository.items.collectAsState(initial = emptyList())
-    val rememberedBrands by repository.requestBrands.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
 
     val categories = remember(allCategories) {
@@ -174,7 +173,7 @@ fun RequestSheetEditorScreen(
                     style = MaterialTheme.typography.titleLarge,
                 )
                 Text(
-                    if (lines.isEmpty()) "اختار الأصناف مرة واحدة وبعدها كمل الكميات والماركات"
+                    if (lines.isEmpty()) "اختار الأصناف مرة واحدة وبعدها كمل الكميات"
                     else "${lines.size} صنف في الكشف",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -207,7 +206,7 @@ fun RequestSheetEditorScreen(
                                                 itemName = line.itemName,
                                                 quantity = line.quantity.toDouble(),
                                                 unit = line.unit,
-                                                brand = line.brand.trim(),
+                                                brand = "",
                                                 usage = line.usage.trim(),
                                                 lineDescription = line.description,
                                                 notes = line.notes,
@@ -293,14 +292,10 @@ fun RequestSheetEditorScreen(
             } else {
                 itemsIndexed(lines, key = { _, line -> line.localId }) { index, line ->
                     val item = line.existingItemId?.let(itemById::get)
-                    val categoryName = line.categoryId?.let { categoryById[it]?.name }.orEmpty()
                     RequestLineEditorCard(
                         index = index,
                         line = line,
                         item = item,
-                        brandSuggestions = (
-                            commonBrandSuggestions(categoryName) + rememberedBrands
-                        ).distinct(),
                         onChange = { lines[index] = it },
                         onDelete = { lines.removeAt(index) },
                     )
@@ -378,112 +373,61 @@ private fun RequestLineEditorCard(
     index: Int,
     line: EditableLineUi,
     item: ItemEntity?,
-    brandSuggestions: List<String>,
     onChange: (EditableLineUi) -> Unit,
     onDelete: () -> Unit,
 ) {
     Card {
         Column(
-            Modifier.fillMaxWidth().padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(9.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Row(verticalAlignment = Alignment.Top) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(
                         "${index + 1}. ${line.itemName}",
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleSmall,
                     )
                     item?.specification
                         ?.takeIf { it.isNotBlank() }
                         ?.let {
                             Text(
                                 it,
-                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 1,
+                                style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                 }
-                IconButton(onClick = onDelete) {
+                IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
                     Icon(Icons.Outlined.DeleteOutline, "حذف الصنف")
                 }
             }
 
-            OutlinedTextField(
-                value = line.quantity,
-                onValueChange = { value ->
-                    if (value.isEmpty() || value.matches(Regex("\\d*(\\.\\d*)?"))) {
-                        onChange(line.copy(quantity = value))
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("الكمية *") },
-                suffix = {
-                    if (line.unit.isNotBlank()) Text(line.unit)
-                },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                singleLine = true,
-            )
-
-            BrandPickerField(
-                value = line.brand,
-                suggestions = brandSuggestions,
-                onValueChange = { onChange(line.copy(brand = it)) },
-            )
-
-            OutlinedTextField(
-                value = line.usage,
-                onValueChange = { onChange(line.copy(usage = it)) },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("مكان الاستخدام (اختياري)") },
-                placeholder = { Text("مثال: حمام / مطبخ — أو سيبه فاضي") },
-                singleLine = true,
-            )
-        }
-    }
-}
-
-@Composable
-private fun BrandPickerField(
-    value: String,
-    suggestions: List<String>,
-    onValueChange: (String) -> Unit,
-) {
-    var menuOpen by remember { mutableStateOf(false) }
-    val filtered = remember(value, suggestions) {
-        suggestions
-            .filter { value.isBlank() || it.contains(value, ignoreCase = true) }
-            .take(12)
-    }
-
-    Box(Modifier.fillMaxWidth()) {
-        OutlinedTextField(
-            value = value,
-            onValueChange = {
-                onValueChange(it)
-                menuOpen = true
-            },
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text("الماركة") },
-            placeholder = { Text("اختار أو اكتب الماركة") },
-            trailingIcon = {
-                IconButton(onClick = { menuOpen = true }) {
-                    Icon(Icons.Outlined.KeyboardArrowDown, "اختيار الماركة")
-                }
-            },
-            singleLine = true,
-        )
-
-        DropdownMenu(
-            expanded = menuOpen && filtered.isNotEmpty(),
-            onDismissRequest = { menuOpen = false },
-        ) {
-            filtered.forEach { brand ->
-                DropdownMenuItem(
-                    text = { Text(brand) },
-                    onClick = {
-                        onValueChange(brand)
-                        menuOpen = false
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedTextField(
+                    value = line.quantity,
+                    onValueChange = { value ->
+                        if (value.isEmpty() || value.matches(Regex("\\d*(\\.\\d*)?"))) {
+                            onChange(line.copy(quantity = value))
+                        }
                     },
+                    modifier = Modifier.weight(0.42f),
+                    label = { Text("الكمية *") },
+                    suffix = { if (line.unit.isNotBlank()) Text(line.unit) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                )
+
+                OutlinedTextField(
+                    value = line.usage,
+                    onValueChange = { onChange(line.copy(usage = it)) },
+                    modifier = Modifier.weight(0.58f),
+                    label = { Text("المكان (اختياري)") },
+                    placeholder = { Text("حمام / مطبخ") },
+                    singleLine = true,
                 )
             }
         }
