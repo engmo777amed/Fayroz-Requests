@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.room.TypeConverters
 import com.fayroz.requests.data.model.*
 
@@ -19,7 +21,7 @@ import com.fayroz.requests.data.model.*
         SupplierDiscountRuleEntity::class,
         SupplierPriceEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
@@ -27,10 +29,18 @@ abstract class FayrozDatabase : RoomDatabase() {
     abstract fun dao(): FayrozDao
 
     companion object {
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE request_lines ADD COLUMN brand TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         fun create(context: Context): FayrozDatabase = Room.databaseBuilder(
             context.applicationContext,
             FayrozDatabase::class.java,
             "fayroz_requests.db",
-        ).build()
+        )
+            .addMigrations(MIGRATION_1_2)
+            .build()
     }
 }
