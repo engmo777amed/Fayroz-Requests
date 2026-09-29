@@ -10,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.fayroz.requests.data.model.CategoryEntity
 import com.fayroz.requests.data.model.ItemEntity
 import com.fayroz.requests.data.repository.FayrozRepository
 import kotlinx.coroutines.launch
@@ -17,6 +18,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}) {
     val allItems by repository.items.collectAsState(initial = emptyList())
+    val categories by repository.categories.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
 
     var showAdd by remember { mutableStateOf(false) }
@@ -25,13 +27,27 @@ fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}
     var message by remember { mutableStateOf<String?>(null) }
     var query by remember { mutableStateOf("") }
 
-    val filtered = remember(allItems, query) {
+    val categoryById = remember(categories) { categories.associateBy { it.id } }
+    val filtered = remember(allItems, query, categoryById) {
         if (query.isBlank()) allItems
-        else allItems.filter {
-            it.name.contains(query, true) ||
-                it.code.contains(query, true) ||
-                it.brand.contains(query, true) ||
-                it.specification.contains(query, true)
+        else allItems.filter { item ->
+            val categoryName = item.categoryId?.let { categoryById[it]?.name }.orEmpty()
+            item.name.contains(query, true) ||
+                item.code.contains(query, true) ||
+                item.brand.contains(query, true) ||
+                item.specification.contains(query, true) ||
+                categoryName.contains(query, true)
+        }
+    }
+
+    val groupedItems = remember(filtered, categories) {
+        buildList {
+            categories.forEach { category ->
+                val group = filtered.filter { it.categoryId == category.id }
+                if (group.isNotEmpty()) add(category.name to group)
+            }
+            val uncategorized = filtered.filter { it.categoryId == null }
+            if (uncategorized.isNotEmpty()) add("بدون تصنيف" to uncategorized)
         }
     }
 
@@ -41,7 +57,7 @@ fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}
     ) {
         ScreenHeader(
             "دليل الأصناف",
-            "كل صنف يُسجل مرة واحدة ويمكن تعديله واستخدامه في الكشوف والأسعار",
+            "الأصناف مرتبة حسب القسم ويمكن إضافتها أو تعديلها أو حذف غير المستخدم منها",
         )
 
         PrimaryAction("إضافة صنف", Icons.Outlined.AddBox) { showAdd = true }
@@ -50,7 +66,8 @@ fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}
             value = query,
             onValueChange = { query = it },
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("بحث بالاسم أو الكود أو الماركة") },
+            label = { Text("بحث في دليل الأصناف") },
+            placeholder = { Text("اسم، كود، ماركة أو قسم") },
             leadingIcon = { Icon(Icons.Outlined.Search, null) },
             singleLine = true,
         )
@@ -60,21 +77,42 @@ fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}
                 Icons.Outlined.Inventory2,
                 "لا توجد أصناف",
                 if (query.isBlank()) {
-                    "أضف أول صنف إلى دليل الأصناف، أو أضفه من داخل كشف جديد."
+                    "أضف أول صنف إلى دليل الأصناف."
                 } else {
                     "لا توجد نتائج مطابقة للبحث."
                 },
             )
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(filtered, key = { it.id }) { item ->
-                    Card {
-                        Column(
-                            Modifier.fillMaxWidth().padding(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                groupedItems.forEach { (categoryName, groupItems) ->
+                    item(key = "category-$categoryName") {
+                        Surface(
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            shape = MaterialTheme.shapes.medium,
                         ) {
                             Row(
-                                Modifier.fillMaxWidth(),
+                                Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 9.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(Icons.Outlined.Category, null)
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    categoryName,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Text(
+                                    groupItems.size.toString(),
+                                    style = MaterialTheme.typography.labelMedium,
+                                )
+                            }
+                        }
+                    }
+
+                    items(groupItems, key = { it.id }) { item ->
+                        Card {
+                            Row(
+                                Modifier.fillMaxWidth().padding(14.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Column(
@@ -131,8 +169,9 @@ fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}
         ItemEditorDialog(
             title = "إضافة صنف",
             item = null,
+            categories = categories,
             onDismiss = { showAdd = false },
-            onSave = { name, unit, brand, specification ->
+            onSave = { name, unit, brand, specification, categoryId ->
                 scope.launch {
                     runCatching {
                         repository.addItem(
@@ -140,6 +179,7 @@ fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}
                             unit = unit,
                             brand = brand,
                             specification = specification,
+                            categoryId = categoryId,
                         )
                     }.onSuccess {
                         showAdd = false
@@ -155,8 +195,9 @@ fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}
         ItemEditorDialog(
             title = "تعديل الصنف",
             item = item,
+            categories = categories,
             onDismiss = { editingItem = null },
-            onSave = { name, unit, brand, specification ->
+            onSave = { name, unit, brand, specification, categoryId ->
                 scope.launch {
                     val error = repository.updateItemDetails(
                         itemId = item.id,
@@ -164,6 +205,7 @@ fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}
                         unit = unit,
                         brand = brand,
                         specification = specification,
+                        categoryId = categoryId,
                     )
                     if (error == null) {
                         editingItem = null
@@ -225,19 +267,57 @@ fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}
 private fun ItemEditorDialog(
     title: String,
     item: ItemEntity?,
+    categories: List<CategoryEntity>,
     onDismiss: () -> Unit,
-    onSave: (name: String, unit: String, brand: String, specification: String) -> Unit,
+    onSave: (
+        name: String,
+        unit: String,
+        brand: String,
+        specification: String,
+        categoryId: Long?,
+    ) -> Unit,
 ) {
     var name by remember(item?.id) { mutableStateOf(item?.name.orEmpty()) }
     var unit by remember(item?.id) { mutableStateOf(item?.defaultUnit.orEmpty()) }
     var brand by remember(item?.id) { mutableStateOf(item?.brand.orEmpty()) }
     var specification by remember(item?.id) { mutableStateOf(item?.specification.orEmpty()) }
+    var categoryId by remember(item?.id) { mutableStateOf(item?.categoryId) }
+    var categoryMenuOpen by remember { mutableStateOf(false) }
+
+    val selectedCategory = categories.firstOrNull { it.id == categoryId }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = { categoryMenuOpen = true },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Outlined.Category, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(selectedCategory?.name ?: "اختيار القسم *")
+                        Spacer(Modifier.weight(1f))
+                        Icon(Icons.Outlined.KeyboardArrowDown, null)
+                    }
+                    DropdownMenu(
+                        expanded = categoryMenuOpen,
+                        onDismissRequest = { categoryMenuOpen = false },
+                    ) {
+                        categories.forEach { category ->
+                            DropdownMenuItem(
+                                text = { Text(category.name) },
+                                onClick = {
+                                    categoryId = category.id
+                                    categoryMenuOpen = false
+                                },
+                            )
+                        }
+                    }
+                }
+
                 OutlinedTextField(
                     name,
                     { name = it },
@@ -284,9 +364,10 @@ private fun ItemEditorDialog(
                         unit.trim(),
                         brand.trim(),
                         specification.trim(),
+                        categoryId,
                     )
                 },
-                enabled = name.isNotBlank() && unit.isNotBlank(),
+                enabled = name.isNotBlank() && unit.isNotBlank() && categoryId != null,
             ) {
                 Text("حفظ")
             }
