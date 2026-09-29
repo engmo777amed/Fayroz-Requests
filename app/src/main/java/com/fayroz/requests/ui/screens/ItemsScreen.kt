@@ -74,7 +74,7 @@ fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}
             onValueChange = { query = it },
             modifier = Modifier.fillMaxWidth(),
             label = { Text("بحث في دليل الأصناف") },
-            placeholder = { Text("اسم، كود، ماركة أو قسم") },
+            placeholder = { Text("اسم، اسم الصنايعي، كود أو قسم") },
             leadingIcon = { Icon(Icons.Outlined.Search, null) },
             singleLine = true,
         )
@@ -178,13 +178,12 @@ fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}
             item = null,
             categories = visibleCategories,
             onDismiss = { showAdd = false },
-            onSave = { name, unit, brand, specification, categoryId ->
+            onSave = { name, unit, specification, categoryId ->
                 scope.launch {
                     runCatching {
                         repository.addItem(
                             name = name,
                             unit = unit,
-                            brand = brand,
                             specification = specification,
                             categoryId = categoryId,
                         )
@@ -202,15 +201,15 @@ fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}
         ItemEditorDialog(
             title = "تعديل الصنف",
             item = item,
-            categories = categories,
+            categories = visibleCategories,
             onDismiss = { editingItem = null },
-            onSave = { name, unit, brand, specification, categoryId ->
+            onSave = { name, unit, specification, categoryId ->
                 scope.launch {
                     val error = repository.updateItemDetails(
                         itemId = item.id,
                         name = name,
                         unit = unit,
-                        brand = brand,
+                        brand = item.brand,
                         specification = specification,
                         categoryId = categoryId,
                     )
@@ -279,14 +278,12 @@ private fun ItemEditorDialog(
     onSave: (
         name: String,
         unit: String,
-        brand: String,
         specification: String,
         categoryId: Long?,
     ) -> Unit,
 ) {
     var name by remember(item?.id) { mutableStateOf(item?.name.orEmpty()) }
     var unit by remember(item?.id) { mutableStateOf(item?.defaultUnit.orEmpty()) }
-    var brand by remember(item?.id) { mutableStateOf(item?.brand.orEmpty()) }
     var specification by remember(item?.id) { mutableStateOf(item?.specification.orEmpty()) }
     var categoryId by remember(item?.id) { mutableStateOf(item?.categoryId) }
     var categoryMenuOpen by remember { mutableStateOf(false) }
@@ -341,13 +338,6 @@ private fun ItemEditorDialog(
                     singleLine = true,
                 )
                 OutlinedTextField(
-                    brand,
-                    { brand = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("الماركة") },
-                    singleLine = true,
-                )
-                OutlinedTextField(
                     specification,
                     { specification = it },
                     modifier = Modifier.fillMaxWidth(),
@@ -369,7 +359,6 @@ private fun ItemEditorDialog(
                     onSave(
                         name.trim(),
                         unit.trim(),
-                        brand.trim(),
                         specification.trim(),
                         categoryId,
                     )
