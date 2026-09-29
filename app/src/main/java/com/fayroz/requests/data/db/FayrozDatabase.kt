@@ -24,7 +24,7 @@ import com.fayroz.requests.data.model.*
         SupplierDiscountRuleEntity::class,
         SupplierPriceEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
@@ -99,12 +99,34 @@ abstract class FayrozDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE request_sheets ADD COLUMN workLocation TEXT NOT NULL DEFAULT ''")
+                db.execSQL(
+                    """
+                    UPDATE request_sheets
+                    SET workLocation = COALESCE(
+                        (
+                            SELECT usage
+                            FROM request_lines
+                            WHERE request_lines.sheetId = request_sheets.id
+                              AND TRIM(usage) != ''
+                            ORDER BY request_lines.id
+                            LIMIT 1
+                        ),
+                        ''
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
+
         fun create(context: Context): FayrozDatabase = Room.databaseBuilder(
             context.applicationContext,
             FayrozDatabase::class.java,
             "fayroz_requests.db",
         )
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
             .build()
     }
 }
