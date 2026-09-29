@@ -46,8 +46,94 @@ object StarterCatalog {
         "أخرى",
     )
 
-    private fun item(category: String, name: String, unit: String, specification: String = "") =
-        StarterItem(category, name, unit, specification)
+    private fun marketAlias(name: String): String = when {
+        name.startsWith("ماسورة PPR") -> "ماسورة مياه حراري"
+        name.startsWith("كوع PPR") -> "كوع حراري"
+        name.startsWith("تي PPR") -> "تي حراري"
+        name.startsWith("جلبة PPR") -> "جلبة حراري"
+        name.startsWith("جلبة سن داخلي PPR") -> "جلبة نحاس داخلي حراري"
+        name.startsWith("جلبة سن خارجي PPR") -> "جلبة نحاس خارجي حراري"
+        name.startsWith("محبس PPR") -> "محبس حراري"
+        name.startsWith("كلبسة تثبيت PPR") -> "كليبسة حراري"
+        name.startsWith("مسّلوب PPR") -> "مسّلوب حراري"
+        name.startsWith("تي مسّلوب PPR") -> "تي مسّلوب حراري"
+        name.startsWith("ماسورة UPVC") -> "ماسورة صرف PVC"
+        name.startsWith("كوع صرف 45") -> "كوع 45 صرف"
+        name.startsWith("كوع صرف 90") -> "كوع 90 صرف"
+        name.startsWith("تي صرف") -> "تي صرف"
+        name.startsWith("واي صرف") -> "واي صرف"
+        name.startsWith("جلبة صرف") -> "سوكت / جلبة صرف"
+        name.startsWith("طبة تسليك") -> "طبة تنظيف"
+        name.startsWith("سيفون أرضية") -> "بيبة أرضية"
+        name == "جالي تراب" -> "جالي تراب / جالي"
+        name.startsWith("شاسيه مرحاض دفن") -> "سيفون دفن / شاسيه دفن"
+        name.startsWith("مرحاض معلق") -> "قاعدة حمام معلقة"
+        name.startsWith("مرحاض أرضي") -> "قاعدة حمام أرضي"
+        name.startsWith("خلاط شاور دفن") -> "خلاط دفن"
+        name.startsWith("هاند شاور") -> "سماعة دش"
+        name.startsWith("مسطرة شاور") -> "عمود دش"
+        name.startsWith("سلك نحاس") -> "سلك كهرباء"
+        name.startsWith("سلك أرضي") -> "سلك أرضي / إيرث"
+        name.startsWith("ماسورة PVC كهرباء") -> "ماسورة كهرباء صلب"
+        name.startsWith("خرطوم كهرباء") -> "خرطوم كهرباء مرن"
+        name.startsWith("علبة ماجيك") -> "علبة ماجيك"
+        name.startsWith("Junction Box") -> "علبة تفريع"
+        name.startsWith("MCB") -> "قاطع أوتوماتيك"
+        name.startsWith("MCCB") -> "مفتاح كومباكت"
+        name.startsWith("RCCB") -> "قاطع تسريب أرضي"
+        name.startsWith("RCBO") -> "قاطع أوتوماتيك بتسريب أرضي"
+        name.startsWith("SPD") -> "مانع زيادة جهد / مانع صواعق"
+        name.startsWith("كونتاكتور") -> "كونتاكتور"
+        name.startsWith("بار نحاس") -> "بسبار نحاس"
+        name.startsWith("بار أرضي") -> "بار إيرث"
+        name.startsWith("بار نيوترال") -> "بار نيوترال"
+        name.startsWith("بريزة Schuko") -> "بريزة شوكو"
+        name.startsWith("Faceplate") -> "وش داتا"
+        name.startsWith("Downlight") -> "داون لايت"
+        name.startsWith("Track Light") -> "تراك لايت"
+        name.startsWith("Driver") -> "درايفر ليد"
+        name.startsWith("Access Point") -> "أكسس بوينت"
+        name.startsWith("Network Switch") -> "سويتش شبكة"
+        name.startsWith("PoE Switch") -> "سويتش PoE"
+        name.startsWith("Patch Panel") -> "باتش بانل"
+        name.startsWith("Rack") -> "راك شبكة"
+        name.startsWith("NVR") -> "جهاز تسجيل كاميرات"
+        name.startsWith("ماسورة نحاس تكييف") -> "ماسورة نحاس فريون"
+        name.startsWith("Flexible Duct") -> "فلكسبل دكت"
+        name.startsWith("Linear Slot Diffuser") -> "سلوت ديفيوزر"
+        name.startsWith("Square Diffuser") -> "ديفيوزر مربع"
+        name.startsWith("Tile Spacer") -> "صليبة سيراميك"
+        name.startsWith("Leveling Clip") -> "كليب تسوية سيراميك"
+        name.startsWith("Leveling Wedge") -> "إسفين تسوية سيراميك"
+        name.startsWith("Stud") -> "قائم C"
+        name.startsWith("Track") -> "مجرى U"
+        name.startsWith("Main Channel") -> "شانيل رئيسي"
+        name.startsWith("Furring Channel") -> "أوميجا"
+        name.startsWith("Wall Angle") -> "زاوية جبس بورد"
+        name.startsWith("Shadow Gap") -> "شادو جاب"
+        name.startsWith("Access Panel") -> "فتحة صيانة"
+        name.startsWith("Door Closer") -> "مساعد باب"
+        name.startsWith("Door Stop") -> "صدادة باب"
+        name.startsWith("Roller") -> "بكرة"
+        name.startsWith("Chemical Anchor") -> "مادة تثبيت كيميائي"
+        name.startsWith("Threaded Rod") -> "سيخ قلاووظ"
+        name.startsWith("PU Sealant") -> "سيلانت بولي يوريثان"
+        name.startsWith("Acrylic Sealant") -> "سيلانت أكريليك"
+        name.startsWith("Contact Adhesive") -> "كولة / لاصق كونتاكت"
+        name.startsWith("Rivet") -> "برشام"
+        name.startsWith("Cable Tie") -> "أفيز بلاستيك"
+        name.startsWith("U-Bolt") -> "يو بولت"
+        else -> ""
+    }
+
+    private fun item(category: String, name: String, unit: String, specification: String = ""): StarterItem {
+        val alias = marketAlias(name)
+        val finalSpec = listOfNotNull(
+            specification.takeIf { it.isNotBlank() },
+            alias.takeIf { it.isNotBlank() }?.let { "الاسم السوقي: $it" },
+        ).joinToString(" • ")
+        return StarterItem(category, name, unit, finalSpec)
+    }
 
     val items: List<StarterItem> = buildList {
         val pprSizes = listOf(20, 25, 32, 40, 50, 63, 75, 90, 110)
