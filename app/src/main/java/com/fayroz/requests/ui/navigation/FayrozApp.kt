@@ -5,7 +5,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -36,9 +35,6 @@ private val destinations = listOf(
 @Composable
 fun FayrozApp(repository: FayrozRepository) {
     val navController = rememberNavController()
-    LaunchedEffect(repository) {
-        repository.ensureStarterCatalog()
-    }
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val detailOpen = currentRoute in setOf(
