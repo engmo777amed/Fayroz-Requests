@@ -512,7 +512,8 @@ private fun ItemPickerDialog(
             query.isBlank() ||
                 item.name.contains(query, true) ||
                 item.code.contains(query, true) ||
-                item.brand.contains(query, true)
+                item.brand.contains(query, true) ||
+                item.specification.contains(query, true)
         }
     }
 
