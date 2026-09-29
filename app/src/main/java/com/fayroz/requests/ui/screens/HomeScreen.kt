@@ -36,7 +36,7 @@ fun HomeScreen(
             }
             AssistChip(
                 onClick = {},
-                label = { Text("V0.8.1") },
+                label = { Text("V0.8.2") },
                 leadingIcon = { Icon(Icons.Outlined.Verified, null) },
             )
         }
