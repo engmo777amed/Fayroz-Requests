@@ -63,6 +63,9 @@ interface FayrozDao {
     @Update suspend fun updateItem(item: ItemEntity)
     @Delete suspend fun deleteItem(item: ItemEntity)
 
+    @Query("SELECT DISTINCT brand FROM request_lines WHERE TRIM(brand) != '' ORDER BY brand COLLATE NOCASE")
+    fun observeRequestBrands(): Flow<List<String>>
+
     @Query("SELECT COUNT(*) FROM request_lines WHERE itemId = :itemId")
     suspend fun countRequestLinesForItem(itemId: Long): Int
 
