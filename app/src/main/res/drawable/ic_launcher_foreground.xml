@@ -1,43 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <!-- Blueprint grid: same visual family as Site Calculator -->
-    <path
-        android:fillColor="@android:color/transparent"
-        android:strokeColor="#315A7C"
-        android:strokeWidth="0.8"
-        android:pathData="M22,28H86M22,40H86M22,52H86M22,64H86M22,76H86M28,22V86M40,22V86M52,22V86M64,22V86M76,22V86" />
-    <path
-        android:fillColor="@android:color/transparent"
-        android:strokeColor="#D3AA54"
-        android:strokeWidth="1.2"
-        android:pathData="M24,78C28,45 45,27 79,24" />
-
-    <!-- rear request sheet -->
-    <path android:fillColor="#171A1E" android:pathData="M30,31H70L79,40V82H30Z"/>
-    <path android:fillColor="#B88736" android:pathData="M70,31L79,40H70Z"/>
-
-    <!-- front request sheet -->
-    <path android:fillColor="#E8DFD1" android:pathData="M38,25H70L82,37V78H38Z"/>
-    <path android:fillColor="#D9B65F" android:pathData="M70,25L82,37H70Z"/>
-
-    <!-- clipboard/header cue -->
-    <path android:fillColor="#171A1E" android:pathData="M47,22H65L69,28H43Z"/>
-    <path android:fillColor="#D9B65F" android:pathData="M49,25H63V29H49Z"/>
-
-    <!-- checklist lines -->
-    <path android:fillColor="#171A1E" android:pathData="M49,43H72V46H49ZM49,54H72V57H49ZM49,65H67V68H49Z"/>
-    <path
-        android:fillColor="@android:color/transparent"
-        android:strokeColor="#79BEEB"
-        android:strokeWidth="2"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:pathData="M42,43L45,46L49,40M42,54L45,57L49,51M42,65L45,68L49,62" />
-
-    <!-- gold base -->
-    <path android:fillColor="#8F6120" android:pathData="M25,82H85V84H25Z"/>
-</vector>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:left="12dp"
+        android:top="12dp"
+        android:right="12dp"
+        android:bottom="12dp">
+        <bitmap
+            android:src="@drawable/ic_launcher_art"
+            android:gravity="fill" />
+    </item>
+</layer-list>
