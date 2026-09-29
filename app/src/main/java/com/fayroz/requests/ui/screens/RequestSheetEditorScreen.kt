@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.fayroz.requests.data.model.CategoryEntity
 import com.fayroz.requests.data.model.ItemEntity
 import com.fayroz.requests.data.model.ProjectEntity
 import com.fayroz.requests.data.model.RequestLineDraft
@@ -39,6 +40,7 @@ fun RequestSheetEditorScreen(
     onOpenProjects: () -> Unit,
 ) {
     val projects by repository.projects.collectAsState(initial = emptyList())
+    val categories by repository.categories.collectAsState(initial = emptyList())
     val items by repository.items.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
 
@@ -304,6 +306,7 @@ fun RequestSheetEditorScreen(
         if (lineIndex in lines.indices) {
             ItemPickerDialog(
                 items = items,
+                categories = categories,
                 onDismiss = { itemPickerIndex = null },
                 onSelect = { item ->
                     val current = lines[lineIndex]
@@ -414,12 +417,24 @@ private fun ProjectPickerDialog(
 @Composable
 private fun ItemPickerDialog(
     items: List<ItemEntity>,
+    categories: List<CategoryEntity>,
     onDismiss: () -> Unit,
     onSelect: (ItemEntity) -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
-    val filtered = remember(items, query) {
-        if (query.isBlank()) items else items.filter { it.name.contains(query, true) || it.code.contains(query, true) }
+    var selectedCategoryId by remember { mutableStateOf<Long?>(null) }
+    var categoryMenuOpen by remember { mutableStateOf(false) }
+
+    val categoryById = remember(categories) { categories.associateBy { it.id } }
+    val filtered = remember(items, query, selectedCategoryId) {
+        items.filter { item ->
+            val categoryMatches = selectedCategoryId == null || item.categoryId == selectedCategoryId
+            val queryMatches = query.isBlank() ||
+                item.name.contains(query, true) ||
+                item.code.contains(query, true) ||
+                item.brand.contains(query, true)
+            categoryMatches && queryMatches
+        }
     }
 
     AlertDialog(
@@ -427,24 +442,81 @@ private fun ItemPickerDialog(
         title = { Text("اختيار صنف من الدليل") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = { categoryMenuOpen = true },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Outlined.Category, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            selectedCategoryId?.let { categoryById[it]?.name } ?: "كل الأقسام",
+                            modifier = Modifier.weight(1f),
+                        )
+                        Icon(Icons.Outlined.KeyboardArrowDown, null)
+                    }
+                    DropdownMenu(
+                        expanded = categoryMenuOpen,
+                        onDismissRequest = { categoryMenuOpen = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("كل الأقسام") },
+                            onClick = {
+                                selectedCategoryId = null
+                                categoryMenuOpen = false
+                            },
+                        )
+                        categories.forEach { category ->
+                            DropdownMenuItem(
+                                text = { Text(category.name) },
+                                onClick = {
+                                    selectedCategoryId = category.id
+                                    categoryMenuOpen = false
+                                },
+                            )
+                        }
+                    }
+                }
+
                 OutlinedTextField(
                     query,
                     { query = it },
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text("بحث") },
+                    placeholder = { Text("اسم الصنف أو الكود أو الماركة") },
                     leadingIcon = { Icon(Icons.Outlined.Search, null) },
                     singleLine = true,
                 )
+
                 if (filtered.isEmpty()) {
-                    Text("الصنف غير موجود. اكتب اسمه مباشرة في الكشف وسيتم إنشاؤه عند الحفظ.")
+                    Text("لا يوجد صنف مطابق. يمكنك كتابة الصنف في الكشف وسيُحفظ في قسم «أخرى»، ثم تعديله من دليل الأصناف.")
                 } else {
-                    LazyColumn(Modifier.heightIn(max = 360.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    LazyColumn(
+                        Modifier.heightIn(max = 360.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
                         itemsIndexed(filtered, key = { _, item -> item.id }) { _, item ->
                             Card(onClick = { onSelect(item) }) {
-                                Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Row(
+                                    Modifier.fillMaxWidth().padding(12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
                                     Column(Modifier.weight(1f)) {
                                         Text(item.name, style = MaterialTheme.typography.titleSmall)
-                                        Text(item.code, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text(
+                                            buildString {
+                                                append(item.code)
+                                                item.categoryId?.let { id ->
+                                                    categoryById[id]?.name?.let { name ->
+                                                        append("  •  ")
+                                                        append(name)
+                                                    }
+                                                }
+                                            },
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
                                     }
                                     Text(item.defaultUnit, style = MaterialTheme.typography.labelLarge)
                                 }
