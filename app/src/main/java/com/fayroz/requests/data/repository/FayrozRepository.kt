@@ -250,11 +250,27 @@ class FayrozRepository(private val database: FayrozDatabase) {
         dao.getPricingCopy(copyId)?.let { dao.deletePricingCopy(it) }
     }
 
-    suspend fun loadPricingCopyDetail(copyId: Long): PricingCopyDetail? {
-        val copy = dao.getPricingCopy(copyId) ?: return null
-        val sheet = dao.getSheet(copy.sheetId) ?: return null
-        val project = dao.getProject(sheet.projectId) ?: return null
-        return PricingCopyDetail(
+    suspend fun loadPricingCopyDetail(copyId: Long): PricingCopyDetail? = database.withTransaction {
+        val copy = dao.getPricingCopy(copyId) ?: return@withTransaction null
+        val sheet = dao.getSheet(copy.sheetId) ?: return@withTransaction null
+        val project = dao.getProject(sheet.projectId) ?: return@withTransaction null
+
+        val currentRequestLines = dao.getRequestLineDetails(sheet.id)
+        val currentCopyLines = dao.getPricingCopyLineDetails(copyId)
+        val existingRequestLineIds = currentCopyLines.map { it.requestLineId }.toSet()
+        val missing = currentRequestLines.filter { it.lineId !in existingRequestLineIds }
+        if (missing.isNotEmpty()) {
+            dao.insertPricingCopyLines(
+                missing.map { requestLine ->
+                    PricingCopyLineEntity(
+                        copyId = copyId,
+                        requestLineId = requestLine.lineId,
+                    )
+                }
+            )
+        }
+
+        PricingCopyDetail(
             copy = copy,
             sheet = sheet,
             project = project,
