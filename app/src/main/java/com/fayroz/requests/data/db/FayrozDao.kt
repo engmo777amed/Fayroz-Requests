@@ -44,6 +44,13 @@ interface FayrozDao {
     suspend fun insertItem(item: ItemEntity): Long
 
     @Update suspend fun updateItem(item: ItemEntity)
+    @Delete suspend fun deleteItem(item: ItemEntity)
+
+    @Query("SELECT COUNT(*) FROM request_lines WHERE itemId = :itemId")
+    suspend fun countRequestLinesForItem(itemId: Long): Int
+
+    @Query("SELECT COUNT(*) FROM supplier_prices WHERE itemId = :itemId")
+    suspend fun countPricesForItem(itemId: Long): Int
 
     @Query("SELECT * FROM suppliers ORDER BY approved DESC, name COLLATE NOCASE")
     fun observeSuppliers(): Flow<List<SupplierEntity>>
