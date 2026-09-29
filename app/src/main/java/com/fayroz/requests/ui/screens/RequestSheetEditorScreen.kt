@@ -250,7 +250,7 @@ fun RequestSheetEditorScreen(
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("بنود الكشف", style = MaterialTheme.typography.titleLarge)
-                        Text("أي صنف جديد سيُضاف تلقائيًا إلى قاعدة الأصناف", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("أي صنف جديد سيُضاف تلقائيًا إلى دليل الأصناف", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     FilledTonalButton(onClick = { addBlankLine() }) {
                         Icon(Icons.Outlined.Add, null)
@@ -339,12 +339,12 @@ private fun RequestLineEditorCard(
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("اسم الصنف *") },
                 trailingIcon = {
-                    IconButton(onClick = onPickItem) { Icon(Icons.Outlined.Inventory2, "اختيار من قاعدة الأصناف") }
+                    IconButton(onClick = onPickItem) { Icon(Icons.Outlined.Inventory2, "اختيار من دليل الأصناف") }
                 },
                 singleLine = true,
             )
             TextButton(onClick = onPickItem, contentPadding = PaddingValues(0.dp)) {
-                Text(if (line.existingItemId == null) "اختيار من قاعدة الأصناف" else "الصنف مرتبط بقاعدة الأصناف ✓")
+                Text(if (line.existingItemId == null) "اختيار من دليل الأصناف" else "الصنف مرتبط بدليل الأصناف ✓")
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(
@@ -424,7 +424,7 @@ private fun ItemPickerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("اختيار صنف") },
+        title = { Text("اختيار صنف من الدليل") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(
