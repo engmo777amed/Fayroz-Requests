@@ -2,6 +2,7 @@ package com.fayroz.requests.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
@@ -26,6 +27,7 @@ fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}
     var deletingItem by remember { mutableStateOf<ItemEntity?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
     var query by remember { mutableStateOf("") }
+    var selectedCategoryId by remember { mutableStateOf<Long?>(null) }
 
     val visibleCategories = remember(categories) {
         categories.filterNot { it.name in com.fayroz.requests.data.repository.StarterCatalog.hiddenCategories }
@@ -35,26 +37,16 @@ fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}
         allItems.filter { it.categoryId == null || it.categoryId in visibleCategoryIds }
     }
     val categoryById = remember(visibleCategories) { visibleCategories.associateBy { it.id } }
-    val filtered = remember(visibleItems, query, categoryById) {
-        if (query.isBlank()) visibleItems
-        else visibleItems.filter { item ->
+    val filtered = remember(visibleItems, query, categoryById, selectedCategoryId) {
+        visibleItems.filter { item ->
+            val categoryMatches = selectedCategoryId == null || item.categoryId == selectedCategoryId
             val categoryName = item.categoryId?.let { categoryById[it]?.name }.orEmpty()
-            item.name.contains(query, true) ||
+            val queryMatches = query.isBlank() ||
+                item.name.contains(query, true) ||
                 item.code.contains(query, true) ||
-                item.brand.contains(query, true) ||
                 item.specification.contains(query, true) ||
                 categoryName.contains(query, true)
-        }
-    }
-
-    val groupedItems = remember(filtered, visibleCategories) {
-        buildList {
-            visibleCategories.forEach { category ->
-                val group = filtered.filter { it.categoryId == category.id }
-                if (group.isNotEmpty()) add(category.name to group)
-            }
-            val uncategorized = filtered.filter { it.categoryId == null }
-            if (uncategorized.isNotEmpty()) add("بدون تصنيف" to uncategorized)
+            categoryMatches && queryMatches
         }
     }
 
@@ -74,9 +66,34 @@ fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}
             onValueChange = { query = it },
             modifier = Modifier.fillMaxWidth(),
             label = { Text("بحث في دليل الأصناف") },
-            placeholder = { Text("اسم، اسم الصنايعي، كود أو قسم") },
+            placeholder = { Text("اسم الصنف أو اسم الصنايعي") },
             leadingIcon = { Icon(Icons.Outlined.Search, null) },
             singleLine = true,
+        )
+
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            item {
+                FilterChip(
+                    selected = selectedCategoryId == null,
+                    onClick = { selectedCategoryId = null },
+                    label = { Text("الكل") },
+                )
+            }
+            items(visibleCategories, key = { it.id }) { category ->
+                FilterChip(
+                    selected = selectedCategoryId == category.id,
+                    onClick = {
+                        selectedCategoryId = if (selectedCategoryId == category.id) null else category.id
+                    },
+                    label = { Text(category.name) },
+                )
+            }
+        }
+
+        Text(
+            "عدد الأصناف: ${filtered.size}",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
         if (filtered.isEmpty()) {
@@ -91,79 +108,55 @@ fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}
             )
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                groupedItems.forEach { (categoryName, groupItems) ->
-                    item(key = "category-$categoryName") {
-                        Surface(
-                            color = MaterialTheme.colorScheme.secondaryContainer,
-                            shape = MaterialTheme.shapes.medium,
+                items(filtered, key = { it.id }) { item ->
+                    Card {
+                        Row(
+                            Modifier.fillMaxWidth().padding(13.dp),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Row(
-                                Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 9.dp),
-                                verticalAlignment = Alignment.CenterVertically,
+                            Column(
+                                Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(3.dp),
                             ) {
-                                Icon(Icons.Outlined.Category, null)
-                                Spacer(Modifier.width(8.dp))
-                                Text(
-                                    categoryName,
-                                    style = MaterialTheme.typography.titleSmall,
-                                    modifier = Modifier.weight(1f),
-                                )
-                                Text(
-                                    groupItems.size.toString(),
-                                    style = MaterialTheme.typography.labelMedium,
-                                )
-                            }
-                        }
-                    }
-
-                    items(groupItems, key = { it.id }) { item ->
-                        Card {
-                            Row(
-                                Modifier.fillMaxWidth().padding(14.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Column(
-                                    Modifier.weight(1f),
-                                    verticalArrangement = Arrangement.spacedBy(3.dp),
-                                ) {
-                                    Text(item.name, style = MaterialTheme.typography.titleMedium)
+                                Text(item.name, style = MaterialTheme.typography.titleMedium)
+                                val categoryName = item.categoryId?.let { categoryById[it]?.name }
+                                if (!categoryName.isNullOrBlank()) {
                                     Text(
-                                        "${item.code}  •  ${item.defaultUnit}",
+                                        categoryName,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.secondary,
+                                    )
+                                }
+                                if (item.specification.isNotBlank()) {
+                                    Text(
+                                        item.specification,
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
-                                    if (item.brand.isNotBlank()) {
-                                        Text(
-                                            "الماركة: ${item.brand}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                        )
-                                    }
-                                    if (item.specification.isNotBlank()) {
-                                        Text(
-                                            item.specification,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
                                 }
+                                Text(
+                                    "الوحدة: ${item.defaultUnit}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
 
-                                IconButton(onClick = { editingItem = item }) {
-                                    Icon(Icons.Outlined.Edit, "تعديل الصنف")
-                                }
-                                IconButton(onClick = { onOpenHistory(item.id) }) {
-                                    Icon(
-                                        Icons.Outlined.History,
-                                        "تاريخ السعر",
-                                        tint = MaterialTheme.colorScheme.primary,
-                                    )
-                                }
-                                IconButton(onClick = { deletingItem = item }) {
-                                    Icon(
-                                        Icons.Outlined.DeleteOutline,
-                                        "حذف الصنف",
-                                        tint = MaterialTheme.colorScheme.error,
-                                    )
-                                }
+                            IconButton(onClick = { editingItem = item }) {
+                                Icon(Icons.Outlined.Edit, "تعديل الصنف")
+                            }
+                            IconButton(onClick = { onOpenHistory(item.id) }) {
+                                Icon(
+                                    Icons.Outlined.History,
+                                    "تاريخ السعر",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                            IconButton(onClick = { deletingItem = item }) {
+                                Icon(
+                                    Icons.Outlined.DeleteOutline,
+                                    "حذف الصنف",
+                                    tint = MaterialTheme.colorScheme.error,
+                                )
                             }
                         }
                     }
