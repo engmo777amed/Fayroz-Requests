@@ -97,6 +97,7 @@ interface FayrozDao {
                rs.sheetDate AS sheetDate,
                rs.trade AS trade,
                rs.craftsmanName AS craftsmanName,
+               rs.workLocation AS workLocation,
                rs.notes AS notes,
                COUNT(rl.id) AS lineCount
         FROM request_sheets rs
