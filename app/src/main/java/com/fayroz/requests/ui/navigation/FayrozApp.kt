@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -27,8 +28,20 @@ data class MainDestination(
 private val destinations = listOf(
     MainDestination("home", "الرئيسية", Icons.Outlined.Home),
     MainDestination("sheets", "الكشوف", Icons.Outlined.ReceiptLong),
-    MainDestination("items", "دليل الأصناف", Icons.Outlined.Inventory2),
+    MainDestination("items", "الأصناف", Icons.Outlined.Inventory2),
     MainDestination("suppliers", "الموردون", Icons.Outlined.Storefront),
+)
+
+private val detailRoutes = setOf(
+    "projects",
+    "pricing",
+    "sheet/new",
+    "sheet/edit/{sheetId}",
+    "supplier/{supplierId}/lists",
+    "pricelist/{priceListId}",
+    "pricelist/{priceListId}/import",
+    "pricing/{sheetId}",
+    "item/{itemId}/history",
 )
 
 @Composable
@@ -36,32 +49,37 @@ fun FayrozApp(repository: FayrozRepository) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
-    val detailOpen = currentRoute in setOf(
-        "sheet/new",
-        "sheet/edit/{sheetId}",
-        "supplier/{supplierId}/lists",
-        "pricelist/{priceListId}",
-        "pricelist/{priceListId}/import",
-        "pricing/{sheetId}",
-        "item/{itemId}/history",
-    )
+    val showBottomBar = currentRoute !in detailRoutes
+
+    fun navigateTopLevel(route: String) {
+        navController.navigate(route) {
+            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
-            if (!detailOpen) {
-                NavigationBar {
+            if (showBottomBar) {
+                NavigationBar(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 0.dp,
+                ) {
                     destinations.forEach { destination ->
                         NavigationBarItem(
                             selected = currentRoute == destination.route,
-                            onClick = {
-                                navController.navigate(destination.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            },
+                            onClick = { navigateTopLevel(destination.route) },
                             icon = { Icon(destination.icon, contentDescription = destination.label) },
                             label = { Text(destination.label) },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            ),
                         )
                     }
                 }
@@ -77,13 +95,18 @@ fun FayrozApp(repository: FayrozRepository) {
                 HomeScreen(
                     onNewSheet = { navController.navigate("sheet/new") },
                     onProjects = { navController.navigate("projects") },
-                    onSheets = { navController.navigate("sheets") },
+                    onSheets = { navigateTopLevel("sheets") },
                     onPricing = { navController.navigate("pricing") },
-                    onSuppliers = { navController.navigate("suppliers") },
-                    onItems = { navController.navigate("items") },
+                    onSuppliers = { navigateTopLevel("suppliers") },
+                    onItems = { navigateTopLevel("items") },
                 )
             }
-            composable("projects") { ProjectsScreen(repository) }
+            composable("projects") {
+                ProjectsScreen(
+                    repository = repository,
+                    onBack = { navController.popBackStack() },
+                )
+            }
             composable("sheets") {
                 RequestSheetsScreen(
                     repository = repository,
@@ -96,6 +119,7 @@ fun FayrozApp(repository: FayrozRepository) {
                 PricingScreen(
                     repository = repository,
                     onPriceSheet = { navController.navigate("pricing/$it") },
+                    onBack = { navController.popBackStack() },
                 )
             }
             composable("suppliers") {
@@ -105,7 +129,10 @@ fun FayrozApp(repository: FayrozRepository) {
                 )
             }
             composable("items") {
-                ItemsScreen(repository, onOpenHistory = { navController.navigate("item/$it/history") })
+                ItemsScreen(
+                    repository,
+                    onOpenHistory = { navController.navigate("item/$it/history") },
+                )
             }
             composable(
                 route = "item/{itemId}/history",
@@ -121,10 +148,7 @@ fun FayrozApp(repository: FayrozRepository) {
                 RequestSheetEditorScreen(
                     repository = repository,
                     sheetId = null,
-                    onDone = {
-                        navController.popBackStack()
-                        navController.navigate("sheets") { launchSingleTop = true }
-                    },
+                    onDone = { navigateTopLevel("sheets") },
                     onCancel = { navController.popBackStack() },
                     onOpenProjects = { navController.navigate("projects") },
                 )
