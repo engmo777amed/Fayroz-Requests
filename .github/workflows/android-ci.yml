@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: android-ci-v6-${{ github.ref }}
+  group: android-ci-v8-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
