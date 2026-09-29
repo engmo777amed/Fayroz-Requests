@@ -11,6 +11,17 @@ data class ProjectEntity(
     val name: String,
     val clientName: String = "",
     val location: String = "",
+    val projectType: String = "",
+    val areaSqm: Double? = null,
+    val floors: Int? = null,
+    val units: Int? = null,
+    val rooms: Int? = null,
+    val bedrooms: Int? = null,
+    val bathrooms: Int? = null,
+    val kitchens: Int? = null,
+    val balconies: Int? = null,
+    val projectStatus: String = "",
+    val notes: String = "",
     val createdAt: Long = System.currentTimeMillis(),
     val archived: Boolean = false,
 )
@@ -20,6 +31,24 @@ data class CategoryEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
 )
+
+
+@Entity(
+    tableName = "category_brands",
+    indices = [Index(value = ["categoryId", "name"], unique = true), Index("categoryId")],
+    foreignKeys = [ForeignKey(
+        entity = CategoryEntity::class,
+        parentColumns = ["id"],
+        childColumns = ["categoryId"],
+        onDelete = ForeignKey.CASCADE,
+    )],
+)
+data class CategoryBrandEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val categoryId: Long,
+    val name: String,
+)
+
 
 @Entity(
     tableName = "items",
@@ -106,6 +135,56 @@ data class RequestLineEntity(
     val usage: String = "",
     val lineDescription: String = "",
     val notes: String = "",
+)
+
+
+@Entity(
+    tableName = "pricing_copies",
+    indices = [Index("sheetId")],
+    foreignKeys = [ForeignKey(
+        entity = RequestSheetEntity::class,
+        parentColumns = ["id"],
+        childColumns = ["sheetId"],
+        onDelete = ForeignKey.CASCADE,
+    )],
+)
+data class PricingCopyEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val sheetId: Long,
+    val placeName: String,
+    val quoteDate: Long = System.currentTimeMillis(),
+    val notes: String = "",
+    val createdAt: Long = System.currentTimeMillis(),
+)
+
+@Entity(
+    tableName = "pricing_copy_lines",
+    indices = [
+        Index("copyId"),
+        Index("requestLineId"),
+        Index(value = ["copyId", "requestLineId"], unique = true),
+    ],
+    foreignKeys = [
+        ForeignKey(
+            entity = PricingCopyEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["copyId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+        ForeignKey(
+            entity = RequestLineEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["requestLineId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+)
+data class PricingCopyLineEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val copyId: Long,
+    val requestLineId: Long,
+    val brand: String = "",
+    val unitPrice: Double? = null,
 )
 
 @Entity(
