@@ -1,26 +1,20 @@
 package com.fayroz.requests.ui.screens
 
-import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import com.fayroz.requests.data.model.*
 import com.fayroz.requests.data.repository.FayrozRepository
-import com.fayroz.requests.domain.PriceFreshnessEngine
-import com.fayroz.requests.export.PricingExport
 import kotlinx.coroutines.launch
 import java.text.DecimalFormat
 import java.time.Instant
@@ -37,24 +31,22 @@ fun PricingScreen(
     var query by remember { mutableStateOf("") }
     val filtered = remember(sheets, query) {
         if (query.isBlank()) sheets else sheets.filter {
-            it.projectName.contains(query, true) || it.sheetNumber.contains(query, true) ||
-                it.trade.contains(query, true) || it.craftsmanName.contains(query, true)
+            it.projectName.contains(query, true) ||
+                it.sheetNumber.contains(query, true) ||
+                it.craftsmanName.contains(query, true)
         }
     }
 
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    Column(
+        Modifier.fillMaxSize().padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         FayrozDetailHeader(
             title = "تسعير الكشوف",
-            subtitle = "اختر كشفًا وقارن آخر أسعار الموردين لكل بند",
+            subtitle = "لكل محل نسخة تسعير مستقلة",
             onBack = onBack,
         )
-        Card {
-            Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("قاعدة الخصم", style = MaterialTheme.typography.titleMedium)
-                Text("خصم الصنف ← خصم المجموعة ← خصم المورد العام", style = MaterialTheme.typography.bodyMedium)
-                Text("سعر الليستة والخصم والصافي محفوظون تاريخيًا.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
+
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
@@ -65,19 +57,26 @@ fun PricingScreen(
         )
 
         if (filtered.isEmpty()) {
-            EmptyState(Icons.Outlined.CompareArrows, "لا توجد كشوف للتسعير", "أنشئ كشف طلبات أولًا، ثم ارجع هنا لتسعيره من أكثر من مورد.")
+            EmptyState(
+                Icons.Outlined.CompareArrows,
+                "لا توجد كشوف للتسعير",
+                "أنشئ كشف طلبات أولًا، ثم اعمل نسخة تسعير لكل محل أو مورد.",
+            )
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(filtered, key = { it.id }) { sheet ->
                     Card(onClick = { onPriceSheet(sheet.id) }) {
-                        Row(Modifier.fillMaxWidth().padding(15.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(13.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 Text("كشف ${sheet.sheetNumber}", style = MaterialTheme.typography.titleMedium)
                                 Text(sheet.projectName, color = MaterialTheme.colorScheme.primary)
-                                Text("${sheet.lineCount} بند • ${sheet.trade.ifBlank { "بدون تخصص" }}", style = MaterialTheme.typography.bodySmall)
+                                Text("${sheet.lineCount} بند", style = MaterialTheme.typography.bodySmall)
                             }
                             FilledTonalIconButton(onClick = { onPriceSheet(sheet.id) }) {
-                                Icon(Icons.Outlined.PriceCheck, "تسعير")
+                                Icon(Icons.Outlined.ContentCopy, "نسخ التسعير")
                             }
                         }
                     }
@@ -92,183 +91,598 @@ fun SheetPricingScreen(
     repository: FayrozRepository,
     sheetId: Long,
     onBack: () -> Unit,
+    onOpenCopy: (Long) -> Unit,
+    onCompare: () -> Unit,
 ) {
-    var comparison by remember { mutableStateOf<SheetPricingComparison?>(null) }
-    var loading by remember { mutableStateOf(true) }
-    var refreshKey by remember { mutableIntStateOf(0) }
-    var directQuoteLine by remember { mutableStateOf<PricingLineComparison?>(null) }
-    val context = LocalContext.current
-    val pdfLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
-        val data = comparison
-        if (uri != null && data != null) {
-            runCatching {
-                context.contentResolver.openOutputStream(uri)?.use { PricingExport.writePdf(it, data) }
-                    ?: error("تعذر فتح الملف")
-            }.onSuccess {
-                Toast.makeText(context, "تم تصدير PDF", Toast.LENGTH_SHORT).show()
-            }.onFailure {
-                Toast.makeText(context, "تعذر تصدير PDF", Toast.LENGTH_LONG).show()
+    val copies by repository.pricingCopies(sheetId).collectAsState(initial = emptyList())
+    val scope = rememberCoroutineScope()
+    var sheet by remember { mutableStateOf<RequestSheetEntity?>(null) }
+    var project by remember { mutableStateOf<ProjectEntity?>(null) }
+    var showCreate by remember { mutableStateOf(false) }
+    var deleteTarget by remember { mutableStateOf<PricingCopySummary?>(null) }
+
+    LaunchedEffect(sheetId) {
+        sheet = repository.getSheet(sheetId)
+        project = sheet?.let { repository.getProject(it.projectId) }
+    }
+
+    Column(
+        Modifier.fillMaxSize().padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        FayrozDetailHeader(
+            title = sheet?.let { "تسعير كشف ${it.sheetNumber}" } ?: "نسخ التسعير",
+            subtitle = project?.name ?: "",
+            onBack = onBack,
+        )
+
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Button(
+                onClick = { showCreate = true },
+                modifier = Modifier.weight(1f),
+            ) {
+                Icon(Icons.Outlined.NoteAdd, null)
+                Spacer(Modifier.width(6.dp))
+                Text("نسخة تسعير")
+            }
+
+            OutlinedButton(
+                onClick = onCompare,
+                enabled = copies.size >= 2,
+                modifier = Modifier.weight(1f),
+            ) {
+                Icon(Icons.Outlined.CompareArrows, null)
+                Spacer(Modifier.width(6.dp))
+                Text("مقارنة")
             }
         }
-    }
-    val xlsxLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    ) { uri ->
-        val data = comparison
-        if (uri != null && data != null) {
-            runCatching {
-                context.contentResolver.openOutputStream(uri)?.use { PricingExport.writeXlsx(it, data) }
-                    ?: error("تعذر فتح الملف")
-            }.onSuccess {
-                Toast.makeText(context, "تم تصدير Excel", Toast.LENGTH_SHORT).show()
-            }.onFailure {
-                Toast.makeText(context, "تعذر تصدير Excel", Toast.LENGTH_LONG).show()
+
+        Text(
+            if (copies.isEmpty()) "اعمل نسخة لكل محل أو مورد."
+            else "${copies.size} نسخة تسعير",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        if (copies.isEmpty()) {
+            EmptyState(
+                Icons.Outlined.ContentCopy,
+                "لسه مفيش نسخ تسعير",
+                "الكشف يفضل واحد، وكل محل ياخد نسخة تسعير مستقلة.",
+            )
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(copies, key = { it.copyId }) { copy ->
+                    Card(onClick = { onOpenCopy(copy.copyId) }) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(13.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text(copy.placeName, style = MaterialTheme.typography.titleMedium)
+                                Text(
+                                    "${copy.pricedCount} / ${copy.lineCount} بند متسعّر",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                if (copy.pricedCount > 0) {
+                                    Text(
+                                        "الإجمالي: ${money(copy.total)}",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = MaterialTheme.colorScheme.secondary,
+                                    )
+                                }
+                            }
+                            IconButton(onClick = { deleteTarget = copy }) {
+                                Icon(Icons.Outlined.DeleteOutline, "حذف النسخة")
+                            }
+                            Icon(Icons.Outlined.ChevronLeft, null)
+                        }
+                    }
+                }
             }
         }
     }
 
-    LaunchedEffect(sheetId, refreshKey) {
+    if (showCreate) {
+        CreatePricingCopyDialog(
+            onDismiss = { showCreate = false },
+            onCreate = { place, notes ->
+                scope.launch {
+                    val id = repository.createPricingCopy(sheetId, place, notes)
+                    showCreate = false
+                    onOpenCopy(id)
+                }
+            },
+        )
+    }
+
+    deleteTarget?.let { copy ->
+        AlertDialog(
+            onDismissRequest = { deleteTarget = null },
+            title = { Text("حذف نسخة التسعير؟") },
+            text = { Text("سيتم حذف أسعار وماركات «${copy.placeName}» فقط، والكشف الأصلي لن يتأثر.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    scope.launch { repository.deletePricingCopy(copy.copyId) }
+                    deleteTarget = null
+                }) { Text("حذف") }
+            },
+            dismissButton = { TextButton(onClick = { deleteTarget = null }) { Text("إلغاء") } },
+        )
+    }
+}
+
+@Composable
+private fun CreatePricingCopyDialog(
+    onDismiss: () -> Unit,
+    onCreate: (String, String) -> Unit,
+) {
+    var place by remember { mutableStateOf("") }
+    var notes by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("نسخة تسعير جديدة") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = place,
+                    onValueChange = { place = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("اسم المحل / المورد *") },
+                    placeholder = { Text("مثال: محل النور") },
+                    singleLine = true,
+                )
+                OutlinedTextField(
+                    value = notes,
+                    onValueChange = { notes = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("ملاحظات (اختياري)") },
+                    maxLines = 2,
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onCreate(place.trim(), notes.trim()) },
+                enabled = place.isNotBlank(),
+            ) { Text("إنشاء النسخة") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } },
+    )
+}
+
+private data class EditableCopyLine(
+    val detail: PricingCopyLineDetail,
+    val brand: String,
+    val priceText: String,
+)
+
+@Composable
+fun PricingCopyEditorScreen(
+    repository: FayrozRepository,
+    copyId: Long,
+    onBack: () -> Unit,
+) {
+    val brandLibrary by repository.categoryBrands.collectAsState(initial = emptyList())
+    val scope = rememberCoroutineScope()
+    var detail by remember { mutableStateOf<PricingCopyDetail?>(null) }
+    val lines = remember { mutableStateListOf<EditableCopyLine>() }
+    var loading by remember { mutableStateOf(true) }
+    var brandTargetIndex by remember { mutableStateOf<Int?>(null) }
+
+    LaunchedEffect(copyId) {
         loading = true
-        comparison = repository.loadPricingComparison(sheetId)
+        detail = repository.loadPricingCopyDetail(copyId)
+        lines.clear()
+        detail?.lines?.forEach { line ->
+            lines += EditableCopyLine(
+                detail = line,
+                brand = line.brand,
+                priceText = line.unitPrice?.let(::formatPlainNumber).orEmpty(),
+            )
+        }
         loading = false
     }
 
     if (loading) {
-        Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) { CircularProgressIndicator() }
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         return
     }
 
-    val data = comparison
+    val data = detail
     if (data == null) {
-        Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            IconButton(onClick = onBack) { Icon(Icons.Outlined.ArrowBack, "رجوع") }
-            EmptyState(Icons.Outlined.ErrorOutline, "الكشف غير موجود", "تعذر فتح بيانات التسعير لهذا الكشف.")
+        Column(Modifier.fillMaxSize().padding(16.dp)) {
+            FayrozDetailHeader("نسخة التسعير", "تعذر تحميل النسخة", onBack)
+        }
+        return
+    }
+
+    val total = lines.sumOf { line ->
+        (line.priceText.toDoubleOrNull() ?: 0.0) * line.detail.quantity
+    }
+
+    Column(Modifier.fillMaxSize()) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            FilledTonalIconButton(onClick = onBack) {
+                Icon(Icons.Outlined.ArrowForward, "رجوع")
+            }
+            Spacer(Modifier.width(8.dp))
+            Column(Modifier.weight(1f)) {
+                Text(data.copy.placeName, style = MaterialTheme.typography.titleLarge)
+                Text(
+                    "كشف ${data.sheet.sheetNumber} • ${data.project.name}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text("الإجمالي", style = MaterialTheme.typography.labelSmall)
+                Text(money(total), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.secondary)
+            }
+        }
+
+        HorizontalDivider()
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(10.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp),
+        ) {
+            itemsIndexed(lines, key = { _, line -> line.detail.requestLineId }) { index, line ->
+                PricingCopyLineCard(
+                    line = line,
+                    onBrandClick = { brandTargetIndex = index },
+                    onPriceChange = { text ->
+                        val current = lines[index]
+                        lines[index] = current.copy(priceText = text)
+                        scope.launch {
+                            repository.updatePricingCopyLine(
+                                copyId = copyId,
+                                requestLineId = current.detail.requestLineId,
+                                brand = current.brand,
+                                unitPrice = text.toDoubleOrNull(),
+                            )
+                        }
+                    },
+                )
+            }
+            item { Spacer(Modifier.height(16.dp)) }
+        }
+    }
+
+    brandTargetIndex?.let { index ->
+        val line = lines.getOrNull(index)
+        if (line != null) {
+            val categoryId = line.detail.categoryId
+            val brands = brandLibrary
+                .filter { categoryId != null && it.categoryId == categoryId }
+                .map { it.name }
+                .distinct()
+            BrandLibraryDialog(
+                title = line.detail.itemName,
+                selected = line.brand,
+                brands = brands,
+                allowAdd = categoryId != null,
+                onDismiss = { brandTargetIndex = null },
+                onSelect = { brand ->
+                    val current = lines[index]
+                    lines[index] = current.copy(brand = brand)
+                    scope.launch {
+                        repository.updatePricingCopyLine(
+                            copyId = copyId,
+                            requestLineId = current.detail.requestLineId,
+                            brand = brand,
+                            unitPrice = current.priceText.toDoubleOrNull(),
+                        )
+                    }
+                    brandTargetIndex = null
+                },
+                onAdd = { brand ->
+                    if (categoryId != null) {
+                        scope.launch {
+                            repository.addCategoryBrand(categoryId, brand)
+                            val current = lines[index]
+                            lines[index] = current.copy(brand = brand)
+                            repository.updatePricingCopyLine(
+                                copyId = copyId,
+                                requestLineId = current.detail.requestLineId,
+                                brand = brand,
+                                unitPrice = current.priceText.toDoubleOrNull(),
+                            )
+                        }
+                    }
+                    brandTargetIndex = null
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun PricingCopyLineCard(
+    line: EditableCopyLine,
+    onBrandClick: () -> Unit,
+    onPriceChange: (String) -> Unit,
+) {
+    Card {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(line.detail.itemName, style = MaterialTheme.typography.titleSmall)
+                    if (line.detail.usage.isNotBlank()) {
+                        Text(
+                            line.detail.usage,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                val lineTotal = (line.priceText.toDoubleOrNull() ?: 0.0) * line.detail.quantity
+                if (line.priceText.isNotBlank()) {
+                    Text(
+                        money(lineTotal),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
+                }
+            }
+
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedTextField(
+                    value = "${formatQuantity(line.detail.quantity)} ${line.detail.unit}",
+                    onValueChange = {},
+                    readOnly = true,
+                    modifier = Modifier.weight(0.42f),
+                    label = { Text("الكمية") },
+                    singleLine = true,
+                )
+
+                OutlinedButton(
+                    onClick = onBrandClick,
+                    modifier = Modifier.weight(0.58f).height(56.dp),
+                ) {
+                    Icon(Icons.Outlined.LocalOffer, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(5.dp))
+                    Text(
+                        line.brand.ifBlank { "اختيار الماركة" },
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Icon(Icons.Outlined.KeyboardArrowDown, null, modifier = Modifier.size(18.dp))
+                }
+            }
+
+            OutlinedTextField(
+                value = line.priceText,
+                onValueChange = { value ->
+                    if (value.isEmpty() || value.matches(Regex("\\d*(\\.\\d*)?"))) {
+                        onPriceChange(value)
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("السعر") },
+                placeholder = { Text("0.00") },
+                suffix = { Text("ج / ${line.detail.unit}") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                singleLine = true,
+            )
+        }
+    }
+}
+
+@Composable
+private fun BrandLibraryDialog(
+    title: String,
+    selected: String,
+    brands: List<String>,
+    allowAdd: Boolean,
+    onDismiss: () -> Unit,
+    onSelect: (String) -> Unit,
+    onAdd: (String) -> Unit,
+) {
+    var newBrand by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("ماركة — $title") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (brands.isEmpty()) {
+                    Text("مفيش ماركات مسجلة للصنف ده.")
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.heightIn(max = 280.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        items(brands) { brand ->
+                            ListItem(
+                                headlineContent = { Text(brand) },
+                                leadingContent = {
+                                    RadioButton(
+                                        selected = selected.equals(brand, ignoreCase = true),
+                                        onClick = { onSelect(brand) },
+                                    )
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
+                }
+
+                if (allowAdd) {
+                    HorizontalDivider()
+                    OutlinedTextField(
+                        value = newBrand,
+                        onValueChange = { newBrand = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("إضافة ماركة للمكتبة") },
+                        singleLine = true,
+                    )
+                    Button(
+                        onClick = { onAdd(newBrand.trim()) },
+                        enabled = newBrand.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Outlined.Add, null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("إضافة واختيار")
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text("إغلاق") } },
+    )
+}
+
+@Composable
+fun PricingCopiesComparisonScreen(
+    repository: FayrozRepository,
+    sheetId: Long,
+    onBack: () -> Unit,
+) {
+    var data by remember { mutableStateOf<PricingCopiesComparison?>(null) }
+    var loading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(sheetId) {
+        loading = true
+        data = repository.loadPricingCopiesComparison(sheetId)
+        loading = false
+    }
+
+    if (loading) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        return
+    }
+
+    val comparison = data
+    if (comparison == null) {
+        Column(Modifier.fillMaxSize().padding(16.dp)) {
+            FayrozDetailHeader("مقارنة التسعيرات", "تعذر تحميل الكشف", onBack)
         }
         return
     }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(18.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxSize().padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                ScreenHeader("تسعير كشف ${data.sheet.sheetNumber}", data.project.name)
-                IconButton(onClick = onBack) { Icon(Icons.Outlined.ArrowBack, "رجوع") }
-            }
+            FayrozDetailHeader(
+                title = "مقارنة تسعيرات كشف ${comparison.sheet.sheetNumber}",
+                subtitle = comparison.project.name,
+                onBack = onBack,
+            )
         }
 
-        item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(
-                    onClick = { pdfLauncher.launch(exportFileName(data, "pdf")) },
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Icon(Icons.Outlined.PictureAsPdf, null)
-                    Spacer(Modifier.width(6.dp))
-                    Text("PDF")
-                }
-                OutlinedButton(
-                    onClick = { xlsxLauncher.launch(exportFileName(data, "xlsx")) },
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Icon(Icons.Outlined.TableView, null)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Excel")
-                }
-            }
-        }
-
-        item {
-            Card {
-                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Column {
-                            Text("تم تسعير", style = MaterialTheme.typography.bodySmall)
-                            Text("${data.pricedLineCount} / ${data.totalLineCount} بند", style = MaterialTheme.typography.titleLarge)
-                        }
-                        data.bestMixTotal?.let {
-                            Column {
-                                Text("أقل تجميعة", style = MaterialTheme.typography.bodySmall)
-                                Text(money(it), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.secondary)
-                            }
-                        }
-                    }
-                    if (data.pricedLineCount < data.totalLineCount) {
-                        Text("بعض البنود لا يوجد لها سعر بعد. أضف ليستة مورد أو عرضًا مباشرًا من داخل البند.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-        }
-
-        if (data.supplierTotals.isNotEmpty()) {
-            item { Text("إجمالي الموردين", style = MaterialTheme.typography.titleMedium) }
-            items(data.supplierTotals, key = { it.supplierId }) { total ->
+        if (comparison.copies.size < 2) {
+            item {
                 Card {
-                    Row(Modifier.fillMaxWidth().padding(14.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(
+                        "اعمل نسختين تسعير على الأقل علشان تظهر المقارنة.",
+                        modifier = Modifier.fillMaxWidth().padding(14.dp),
+                    )
+                }
+            }
+        } else {
+            item {
+                Text("إجمالي النسخ", style = MaterialTheme.typography.titleMedium)
+            }
+
+            items(comparison.copies, key = { it.copy.id }) { copy ->
+                Card {
+                    Row(
+                        Modifier.fillMaxWidth().padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         Column {
-                            Text(total.supplierName, style = MaterialTheme.typography.titleMedium)
+                            Text(copy.copy.placeName, style = MaterialTheme.typography.titleSmall)
                             Text(
-                                if (total.complete) "مسعّر كل البنود" else "${total.coveredLines}/${total.totalLines} بند",
+                                "${copy.pricedCount}/${copy.lines.size} بند",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = if (total.complete) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        Text(money(total.totalNet), style = MaterialTheme.typography.titleLarge)
+                        Text(money(copy.total), style = MaterialTheme.typography.titleMedium)
                     }
                 }
             }
-        }
 
-        item { Text("تفاصيل البنود", style = MaterialTheme.typography.titleMedium) }
+            val baseLines = comparison.copies.firstOrNull()?.lines.orEmpty()
+            item {
+                Spacer(Modifier.height(4.dp))
+                Text("مقارنة البنود", style = MaterialTheme.typography.titleMedium)
+            }
 
-        items(data.lines, key = { it.lineId }) { line ->
-            Card {
-                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Column(Modifier.weight(1f)) {
-                            Text(line.itemName, style = MaterialTheme.typography.titleMedium)
-                            Text("${formatQuantity(line.quantity)} ${line.unit}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
-                            if (line.usage.isNotBlank()) Text("الاستخدام: ${line.usage}", style = MaterialTheme.typography.bodySmall)
-                            if (line.lineDescription.isNotBlank()) Text(line.lineDescription, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        FilledTonalIconButton(onClick = { directQuoteLine = line }) {
-                            Icon(Icons.Outlined.AddCard, "عرض مباشر")
-                        }
+            items(baseLines, key = { it.requestLineId }) { baseLine ->
+                val offers = comparison.copies.mapNotNull { copy ->
+                    copy.lines.firstOrNull { it.requestLineId == baseLine.requestLineId }?.let { line ->
+                        Triple(copy, line, line.unitPrice)
                     }
+                }
+                val lowest = offers.mapNotNull { it.third }.minOrNull()
 
-                    if (line.offers.isEmpty()) {
-                        Text("لا يوجد سعر لهذا الصنف حتى الآن.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        OutlinedButton(onClick = { directQuoteLine = line }, modifier = Modifier.fillMaxWidth()) {
-                            Icon(Icons.Outlined.Add, null)
-                            Spacer(Modifier.width(6.dp))
-                            Text("إضافة عرض سعر مباشر")
+                Card {
+                    Column(
+                        Modifier.fillMaxWidth().padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(baseLine.itemName, style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "${formatQuantity(baseLine.quantity)} ${baseLine.unit}",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
                         }
-                    } else {
-                        line.offers.forEachIndexed { index, offer ->
-                            val lowest = index == 0
+
+                        offers.forEach { (copy, line, price) ->
+                            val isLowest = price != null && lowest != null && price == lowest
                             Surface(
-                                shape = MaterialTheme.shapes.large,
-                                color = if (lowest) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                                shape = MaterialTheme.shapes.medium,
+                                color = if (isLowest) MaterialTheme.colorScheme.secondaryContainer
+                                else MaterialTheme.colorScheme.surfaceVariant,
                             ) {
-                                Column(Modifier.fillMaxWidth().padding(11.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                            Text(offer.supplierName, style = MaterialTheme.typography.titleSmall)
-                                            if (lowest) SuggestionChip(onClick = {}, label = { Text("أقل صافي") })
-                                        }
-                                        Text(money(offer.totalNet), style = MaterialTheme.typography.titleMedium)
+                                Row(
+                                    Modifier.fillMaxWidth().padding(horizontal = 9.dp, vertical = 7.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text(copy.copy.placeName, style = MaterialTheme.typography.labelLarge)
+                                        Text(
+                                            line.brand.ifBlank { "بدون ماركة" },
+                                            style = MaterialTheme.typography.bodySmall,
+                                        )
                                     }
-                                    Text(
-                                        "ليستة ${money(offer.listPrice)}  •  خصم ${formatDiscount(offer.discountPercent)}  •  صافي الوحدة ${money(offer.netUnitPrice)}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                    )
-                                    val freshness = PriceFreshnessEngine.evaluate(offer.priceDate)
-                                    Text(
-                                        "${sourceLabel(offer.source)} • ${formatDate(offer.priceDate)} • ${freshness.statusLabel} (${freshness.label})",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text(
+                                            price?.let(::money) ?: "غير مسعّر",
+                                            style = MaterialTheme.typography.labelLarge,
+                                        )
+                                        price?.let {
+                                            Text(
+                                                money(it * line.quantity),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -276,172 +690,22 @@ fun SheetPricingScreen(
                 }
             }
         }
+
+        item { Spacer(Modifier.height(18.dp)) }
     }
-
-    directQuoteLine?.let { line ->
-        DirectQuoteDialog(
-            repository = repository,
-            line = line,
-            onDismiss = { directQuoteLine = null },
-            onSaved = {
-                directQuoteLine = null
-                refreshKey++
-            },
-        )
-    }
-}
-
-@Composable
-private fun DirectQuoteDialog(
-    repository: FayrozRepository,
-    line: PricingLineComparison,
-    onDismiss: () -> Unit,
-    onSaved: () -> Unit,
-) {
-    val suppliers by repository.suppliers.collectAsState(initial = emptyList())
-    val approvedSuppliers = remember(suppliers) { suppliers.filter { it.approved } }
-    val scope = rememberCoroutineScope()
-    var selectedSupplier by remember { mutableStateOf<SupplierEntity?>(null) }
-    var showSupplierPicker by remember { mutableStateOf(false) }
-    var price by remember { mutableStateOf("") }
-    var discount by remember { mutableStateOf("") }
-    var rememberDiscount by remember { mutableStateOf(false) }
-    var notes by remember { mutableStateOf("") }
-    var saving by remember { mutableStateOf(false) }
-
-    LaunchedEffect(selectedSupplier?.id) {
-        val supplier = selectedSupplier ?: return@LaunchedEffect
-        discount = repository.suggestedDiscountPercent(supplier.id, line.itemId).toString()
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("عرض مباشر — ${line.itemName}") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(onClick = { showSupplierPicker = true }, modifier = Modifier.fillMaxWidth()) {
-                    Icon(Icons.Outlined.Storefront, null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(selectedSupplier?.name ?: "اختيار المورد")
-                }
-                OutlinedTextField(
-                    value = price,
-                    onValueChange = { price = it },
-                    label = { Text("السعر قبل الخصم *") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                )
-                OutlinedTextField(
-                    value = discount,
-                    onValueChange = { discount = it },
-                    label = { Text("الخصم %") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                )
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("احفظ الخصم كخصم خاص للصنف", modifier = Modifier.weight(1f))
-                    Checkbox(checked = rememberDiscount, onCheckedChange = { rememberDiscount = it })
-                }
-                val p = price.toDoubleOrNull() ?: 0.0
-                val d = discount.toDoubleOrNull() ?: 0.0
-                val net = p * (1.0 - d.coerceIn(0.0, 100.0) / 100.0)
-                Text("صافي الوحدة: ${money(net)}", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.secondary)
-                Text("إجمالي البند: ${money(net * line.quantity)}", style = MaterialTheme.typography.titleMedium)
-                OutlinedTextField(notes, { notes = it }, label = { Text("ملاحظات / مرجع العرض") }, minLines = 2)
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    val supplier = selectedSupplier ?: return@Button
-                    saving = true
-                    scope.launch {
-                        repository.addDirectQuote(
-                            supplierId = supplier.id,
-                            itemId = line.itemId,
-                            quotedPrice = price.toDoubleOrNull() ?: 0.0,
-                            discountPercent = discount.toDoubleOrNull(),
-                            rememberAsItemDiscount = rememberDiscount,
-                            notes = notes,
-                        )
-                        saving = false
-                        onSaved()
-                    }
-                },
-                enabled = selectedSupplier != null && (price.toDoubleOrNull() ?: -1.0) >= 0.0 && (discount.toDoubleOrNull() ?: -1.0) in 0.0..100.0 && !saving,
-            ) { Text(if (saving) "جارٍ الحفظ" else "حفظ العرض") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } },
-    )
-
-    if (showSupplierPicker) {
-        SupplierPickerDialog(
-            suppliers = approvedSuppliers,
-            onDismiss = { showSupplierPicker = false },
-            onSelect = {
-                selectedSupplier = it
-                showSupplierPicker = false
-            },
-        )
-    }
-}
-
-@Composable
-private fun SupplierPickerDialog(
-    suppliers: List<SupplierEntity>,
-    onDismiss: () -> Unit,
-    onSelect: (SupplierEntity) -> Unit,
-) {
-    var query by remember { mutableStateOf("") }
-    val filtered = remember(suppliers, query) {
-        if (query.isBlank()) suppliers else suppliers.filter { it.name.contains(query, true) || it.specialty.contains(query, true) }
-    }
-
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = MaterialTheme.shapes.extraLarge, tonalElevation = 6.dp) {
-            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("اختيار المورد", style = MaterialTheme.typography.titleLarge)
-                OutlinedTextField(
-                    query,
-                    { query = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("بحث") },
-                    leadingIcon = { Icon(Icons.Outlined.Search, null) },
-                    singleLine = true,
-                )
-                if (filtered.isEmpty()) {
-                    Text("لا يوجد موردون معتمدون.", style = MaterialTheme.typography.bodyMedium)
-                } else {
-                    LazyColumn(Modifier.heightIn(max = 360.dp)) {
-                        items(filtered, key = { it.id }) { supplier ->
-                            ListItem(
-                                headlineContent = { Text(supplier.name) },
-                                supportingContent = { Text("خصم افتراضي ${formatDiscount(supplier.defaultDiscountPercent)}${if (supplier.specialty.isBlank()) "" else " • ${supplier.specialty}"}") },
-                                modifier = Modifier.clickable { onSelect(supplier) },
-                            )
-                        }
-                    }
-                }
-                TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text("إلغاء") }
-            }
-        }
-    }
-}
-
-private fun exportFileName(data: SheetPricingComparison, extension: String): String {
-    val safeProject = data.project.name.replace(Regex("[^\\p{L}\\p{N}_-]+"), "_").trim('_').take(35)
-    return "FAYROZ_${safeProject.ifBlank { "Project" }}_Sheet_${data.sheet.sheetNumber}.$extension"
 }
 
 private val pricingMoneyFormat = DecimalFormat("#,##0.00")
+
 private fun money(value: Double): String = "${pricingMoneyFormat.format(value)} ج"
-private fun formatDiscount(value: Double): String = if (value % 1.0 == 0.0) "${value.toInt()}%" else "${pricingMoneyFormat.format(value)}%"
-private fun formatQuantity(value: Double): String = if (value % 1.0 == 0.0) value.toInt().toString() else pricingMoneyFormat.format(value)
-private fun sourceLabel(source: PriceSource): String = when (source) {
-    PriceSource.PRICE_LIST -> "ليستة مورد"
-    PriceSource.DIRECT_QUOTE -> "عرض مباشر"
-    PriceSource.MANUAL -> "سعر يدوي"
-}
-private fun formatDate(timestamp: Long): String = DateTimeFormatter.ofPattern("dd/MM/yyyy")
-    .withZone(ZoneId.systemDefault())
-    .format(Instant.ofEpochMilli(timestamp))
+
+private fun formatQuantity(value: Double): String =
+    if (value % 1.0 == 0.0) value.toInt().toString() else pricingMoneyFormat.format(value)
+
+private fun formatPlainNumber(value: Double): String =
+    if (value % 1.0 == 0.0) value.toLong().toString() else value.toString()
+
+private fun formatDate(timestamp: Long): String =
+    DateTimeFormatter.ofPattern("dd/MM/yyyy")
+        .withZone(ZoneId.systemDefault())
+        .format(Instant.ofEpochMilli(timestamp))
