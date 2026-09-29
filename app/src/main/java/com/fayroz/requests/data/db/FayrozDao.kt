@@ -33,6 +33,9 @@ interface FayrozDao {
 
     @Insert suspend fun insertCategory(category: CategoryEntity): Long
 
+    @Query("UPDATE items SET categoryId = :categoryId WHERE categoryId IS NULL")
+    suspend fun assignUncategorizedItems(categoryId: Long)
+
     @Query("SELECT * FROM items ORDER BY name COLLATE NOCASE")
     fun observeItems(): Flow<List<ItemEntity>>
 
