@@ -22,6 +22,17 @@ interface FayrozDao {
     @Update suspend fun updateProject(project: ProjectEntity)
     @Delete suspend fun deleteProject(project: ProjectEntity)
 
+    @Query("SELECT * FROM categories ORDER BY name COLLATE NOCASE")
+    fun observeCategories(): Flow<List<CategoryEntity>>
+
+    @Query("SELECT * FROM categories ORDER BY name COLLATE NOCASE")
+    suspend fun getCategories(): List<CategoryEntity>
+
+    @Query("SELECT * FROM categories WHERE name = :name COLLATE NOCASE LIMIT 1")
+    suspend fun findCategoryByName(name: String): CategoryEntity?
+
+    @Insert suspend fun insertCategory(category: CategoryEntity): Long
+
     @Query("SELECT * FROM items ORDER BY name COLLATE NOCASE")
     fun observeItems(): Flow<List<ItemEntity>>
 
