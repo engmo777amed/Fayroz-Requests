@@ -35,7 +35,8 @@ fun RequestSheetsScreen(
     val filtered = remember(sheets, query) {
         if (query.isBlank()) sheets else sheets.filter {
             it.projectName.contains(query, true) || it.sheetNumber.contains(query, true) ||
-                it.trade.contains(query, true) || it.craftsmanName.contains(query, true)
+                it.trade.contains(query, true) || it.craftsmanName.contains(query, true) ||
+                it.workLocation.contains(query, true)
         }
     }
 
@@ -54,27 +55,63 @@ fun RequestSheetsScreen(
         if (filtered.isEmpty()) {
             EmptyState(Icons.Outlined.ReceiptLong, "لا توجد كشوف بعد", "اختار الأصناف وحدد الكمية، ومكان الاستخدام اختياري.")
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(7.dp)) {
                 items(filtered, key = { it.id }) { sheet ->
                     Card(onClick = { onEditSheet(sheet.id) }) {
-                        Column(Modifier.fillMaxWidth().padding(15.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Column(
+                            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalArrangement = Arrangement.spacedBy(5.dp),
+                        ) {
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                            ) {
                                 Column(Modifier.weight(1f)) {
-                                    Text("كشف ${sheet.sheetNumber}", style = MaterialTheme.typography.titleMedium)
-                                    Text(sheet.projectName, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                                    Text("كشف ${sheet.sheetNumber} • ${sheet.projectName}", style = MaterialTheme.typography.titleSmall)
+                                    val info = buildList {
+                                        if (sheet.workLocation.isNotBlank()) add("المكان: ${sheet.workLocation}")
+                                        if (sheet.craftsmanName.isNotBlank()) add("الصنايعي: ${sheet.craftsmanName}")
+                                        add("${sheet.lineCount} بند")
+                                    }
+                                    Text(
+                                        info.joinToString(" • "),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                    )
                                 }
-                                Row {
-                                    IconButton(onClick = { onPriceSheet(sheet.id) }) { Icon(Icons.Outlined.PriceCheck, "تسعير") }
-                                    IconButton(onClick = { onEditSheet(sheet.id) }) { Icon(Icons.Outlined.EditNote, "تعديل") }
-                                    IconButton(onClick = { deleteTarget = sheet }) { Icon(Icons.Outlined.DeleteOutline, "حذف") }
+                                IconButton(
+                                    onClick = { deleteTarget = sheet },
+                                    modifier = Modifier.size(34.dp),
+                                ) {
+                                    Icon(Icons.Outlined.DeleteOutline, "حذف", modifier = Modifier.size(19.dp))
                                 }
                             }
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text(sheet.trade.ifBlank { "بدون تخصص" }, style = MaterialTheme.typography.bodySmall)
-                                Text("${sheet.lineCount} بند", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
+
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Button(
+                                    onClick = { onPriceSheet(sheet.id) },
+                                    modifier = Modifier.weight(1f).height(40.dp),
+                                    contentPadding = PaddingValues(horizontal = 10.dp),
+                                ) {
+                                    Icon(Icons.Outlined.PriceCheck, null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(5.dp))
+                                    Text("تسعير الكشف")
+                                }
+
+                                OutlinedButton(
+                                    onClick = { onEditSheet(sheet.id) },
+                                    modifier = Modifier.weight(0.72f).height(40.dp),
+                                    contentPadding = PaddingValues(horizontal = 8.dp),
+                                ) {
+                                    Icon(Icons.Outlined.EditNote, null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("تعديل")
+                                }
                             }
-                            if (sheet.craftsmanName.isNotBlank()) Text("الصنايعي: ${sheet.craftsmanName}", style = MaterialTheme.typography.bodySmall)
-                            Text(formatDate(sheet.sheetDate), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
