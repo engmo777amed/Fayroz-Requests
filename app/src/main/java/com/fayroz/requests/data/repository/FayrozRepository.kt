@@ -6,6 +6,7 @@ import com.fayroz.requests.data.importer.*
 import com.fayroz.requests.data.model.*
 import com.fayroz.requests.domain.PricingEngine
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import java.util.Locale
 import java.util.UUID
 
@@ -293,7 +294,7 @@ class FayrozRepository(private val database: FayrozDatabase) {
     suspend fun loadPricingCopiesComparison(sheetId: Long): PricingCopiesComparison? {
         val sheet = dao.getSheet(sheetId) ?: return null
         val project = dao.getProject(sheet.projectId) ?: return null
-        val summaries = kotlinx.coroutines.flow.first(dao.observePricingCopies(sheetId))
+        val summaries = dao.observePricingCopies(sheetId).first()
         val copies = summaries.mapNotNull { loadPricingCopyDetail(it.copyId) }
         return PricingCopiesComparison(sheet, project, copies)
     }
