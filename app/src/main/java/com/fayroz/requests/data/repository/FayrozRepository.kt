@@ -15,6 +15,7 @@ class FayrozRepository(private val database: FayrozDatabase) {
     val projects: Flow<List<ProjectEntity>> = dao.observeProjects()
     val categories: Flow<List<CategoryEntity>> = dao.observeCategories()
     val items: Flow<List<ItemEntity>> = dao.observeItems()
+    val requestBrands: Flow<List<String>> = dao.observeRequestBrands()
     val sheetSummaries: Flow<List<RequestSheetSummary>> = dao.observeSheetSummaries()
     val suppliers: Flow<List<SupplierEntity>> = dao.observeSuppliers()
 
