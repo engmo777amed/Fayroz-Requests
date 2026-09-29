@@ -41,6 +41,8 @@ private val detailRoutes = setOf(
     "pricelist/{priceListId}",
     "pricelist/{priceListId}/import",
     "pricing/{sheetId}",
+    "pricing/{sheetId}/copy/{copyId}",
+    "pricing/{sheetId}/compare",
     "item/{itemId}/history",
 )
 
@@ -204,7 +206,37 @@ fun FayrozApp(repository: FayrozRepository) {
                 route = "pricing/{sheetId}",
                 arguments = listOf(navArgument("sheetId") { type = NavType.LongType }),
             ) { entry ->
+                val sheetId = entry.arguments?.getLong("sheetId") ?: 0L
                 SheetPricingScreen(
+                    repository = repository,
+                    sheetId = sheetId,
+                    onBack = { navController.popBackStack() },
+                    onOpenCopy = { copyId ->
+                        navController.navigate("pricing/$sheetId/copy/$copyId")
+                    },
+                    onCompare = {
+                        navController.navigate("pricing/$sheetId/compare")
+                    },
+                )
+            }
+            composable(
+                route = "pricing/{sheetId}/copy/{copyId}",
+                arguments = listOf(
+                    navArgument("sheetId") { type = NavType.LongType },
+                    navArgument("copyId") { type = NavType.LongType },
+                ),
+            ) { entry ->
+                PricingCopyEditorScreen(
+                    repository = repository,
+                    copyId = entry.arguments?.getLong("copyId") ?: 0L,
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = "pricing/{sheetId}/compare",
+                arguments = listOf(navArgument("sheetId") { type = NavType.LongType }),
+            ) { entry ->
+                PricingCopiesComparisonScreen(
                     repository = repository,
                     sheetId = entry.arguments?.getLong("sheetId") ?: 0L,
                     onBack = { navController.popBackStack() },
