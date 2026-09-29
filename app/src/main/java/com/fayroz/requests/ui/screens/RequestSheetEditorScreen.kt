@@ -22,6 +22,7 @@ import kotlinx.coroutines.launch
 
 private data class EditableLineUi(
     val localId: Long,
+    val categoryId: Long? = null,
     val existingItemId: Long? = null,
     val itemName: String = "",
     val quantity: String = "",
@@ -79,6 +80,7 @@ fun RequestSheetEditorScreen(
                     lines.add(
                         EditableLineUi(
                             localId = index.toLong() + 1,
+                            categoryId = items.firstOrNull { it.id == line.existingItemId }?.categoryId,
                             existingItemId = line.existingItemId,
                             itemName = line.itemName,
                             quantity = formatQuantity(line.quantity),
@@ -95,6 +97,20 @@ fun RequestSheetEditorScreen(
         } else {
             if (lines.isEmpty()) addBlankLine()
             isLoading = false
+        }
+    }
+
+    LaunchedEffect(items) {
+        if (items.isNotEmpty()) {
+            lines.indices.forEach { index ->
+                val line = lines[index]
+                if (line.categoryId == null && line.existingItemId != null) {
+                    val categoryId = items.firstOrNull { it.id == line.existingItemId }?.categoryId
+                    if (categoryId != null) {
+                        lines[index] = line.copy(categoryId = categoryId)
+                    }
+                }
+            }
         }
     }
 
@@ -145,7 +161,7 @@ fun RequestSheetEditorScreen(
                     errorMessage = validation
                     val projectId = selectedProjectId
                     if (validation == null && projectId != null) {
-                        val validLines = lines.filter { it.itemName.isNotBlank() && (it.quantity.toDoubleOrNull() ?: 0.0) > 0 }
+                        val validLines = lines.filter { it.existingItemId != null && (it.quantity.toDoubleOrNull() ?: 0.0) > 0 }
                         scope.launch {
                             isSaving = true
                             runCatching {
@@ -252,7 +268,7 @@ fun RequestSheetEditorScreen(
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("بنود الكشف", style = MaterialTheme.typography.titleLarge)
-                        Text("أي صنف جديد سيُضاف تلقائيًا إلى دليل الأصناف", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("اختار القسم ثم الصنف، والوحدة تتحدد تلقائيًا", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     FilledTonalButton(onClick = { addBlankLine() }) {
                         Icon(Icons.Outlined.Add, null)
@@ -266,8 +282,9 @@ fun RequestSheetEditorScreen(
                 RequestLineEditorCard(
                     index = index,
                     line = line,
+                    categories = categories,
                     onChange = { lines[index] = it },
-                    onPickItem = { itemPickerIndex = index },
+                    onPickItem = { if (line.categoryId != null) itemPickerIndex = index },
                     onDelete = { if (lines.size > 1) lines.removeAt(index) else lines[index] = EditableLineUi(localId = line.localId) },
                 )
             }
@@ -305,15 +322,16 @@ fun RequestSheetEditorScreen(
     itemPickerIndex?.let { lineIndex ->
         if (lineIndex in lines.indices) {
             ItemPickerDialog(
-                items = items,
+                items = items.filter { it.categoryId == lines[lineIndex].categoryId },
                 categories = categories,
                 onDismiss = { itemPickerIndex = null },
                 onSelect = { item ->
                     val current = lines[lineIndex]
                     lines[lineIndex] = current.copy(
+                        categoryId = item.categoryId,
                         existingItemId = item.id,
                         itemName = item.name,
-                        unit = if (current.unit.isBlank()) item.defaultUnit else current.unit,
+                        unit = item.defaultUnit,
                     )
                     itemPickerIndex = null
                 },
@@ -326,49 +344,114 @@ fun RequestSheetEditorScreen(
 private fun RequestLineEditorCard(
     index: Int,
     line: EditableLineUi,
+    categories: List<CategoryEntity>,
     onChange: (EditableLineUi) -> Unit,
     onPickItem: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    var categoryMenuOpen by remember(line.localId) { mutableStateOf(false) }
+    val selectedCategory = categories.firstOrNull { it.id == line.categoryId }
+
     Card {
-        Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(
+            Modifier.fillMaxWidth().padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("بند ${index + 1}", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                IconButton(onClick = onDelete) { Icon(Icons.Outlined.DeleteOutline, "حذف البند") }
+                Text(
+                    "بند ${index + 1}",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Outlined.DeleteOutline, "حذف البند")
+                }
             }
-            OutlinedTextField(
-                value = line.itemName,
-                onValueChange = { onChange(line.copy(itemName = it, existingItemId = null)) },
+
+            Box(Modifier.fillMaxWidth()) {
+                OutlinedButton(
+                    onClick = { categoryMenuOpen = true },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Outlined.Category, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        selectedCategory?.name ?: "اختيار القسم *",
+                        modifier = Modifier.weight(1f),
+                    )
+                    Icon(Icons.Outlined.KeyboardArrowDown, null)
+                }
+                DropdownMenu(
+                    expanded = categoryMenuOpen,
+                    onDismissRequest = { categoryMenuOpen = false },
+                ) {
+                    categories.forEach { category ->
+                        DropdownMenuItem(
+                            text = { Text(category.name) },
+                            onClick = {
+                                categoryMenuOpen = false
+                                if (line.categoryId != category.id) {
+                                    onChange(
+                                        line.copy(
+                                            categoryId = category.id,
+                                            existingItemId = null,
+                                            itemName = "",
+                                            unit = "",
+                                        )
+                                    )
+                                }
+                            },
+                        )
+                    }
+                }
+            }
+
+            OutlinedButton(
+                onClick = onPickItem,
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("اسم الصنف *") },
-                trailingIcon = {
-                    IconButton(onClick = onPickItem) { Icon(Icons.Outlined.Inventory2, "اختيار من دليل الأصناف") }
+                enabled = line.categoryId != null,
+            ) {
+                Icon(Icons.Outlined.Inventory2, null)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    if (line.existingItemId == null) "اختيار الصنف *" else line.itemName,
+                    modifier = Modifier.weight(1f),
+                )
+                Icon(Icons.Outlined.KeyboardArrowDown, null)
+            }
+
+            if (line.categoryId == null) {
+                Text(
+                    "اختار القسم الأول، وبعدها هتظهر أصناف القسم.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else if (line.existingItemId != null) {
+                Text(
+                    "الوحدة: ${line.unit}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+
+            OutlinedTextField(
+                value = line.quantity,
+                onValueChange = { value ->
+                    if (value.isEmpty() || value.matches(Regex("\\d*(\\.\\d*)?"))) {
+                        onChange(line.copy(quantity = value))
+                    }
                 },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("الكمية *") },
+                placeholder = { Text("أدخل الكمية") },
+                suffix = {
+                    if (line.unit.isNotBlank()) Text(line.unit)
+                },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 singleLine = true,
+                enabled = line.existingItemId != null,
             )
-            TextButton(onClick = onPickItem, contentPadding = PaddingValues(0.dp)) {
-                Text(if (line.existingItemId == null) "اختيار من دليل الأصناف" else "الصنف مرتبط بدليل الأصناف ✓")
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(
-                    value = line.quantity,
-                    onValueChange = { value ->
-                        if (value.isEmpty() || value.matches(Regex("\\d*(\\.\\d*)?"))) onChange(line.copy(quantity = value))
-                    },
-                    modifier = Modifier.weight(1f),
-                    label = { Text("الكمية *") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                )
-                OutlinedTextField(
-                    value = line.unit,
-                    onValueChange = { onChange(line.copy(unit = it)) },
-                    modifier = Modifier.weight(1f),
-                    label = { Text("الوحدة *") },
-                    placeholder = { Text("لفة / م / عدد") },
-                    singleLine = true,
-                )
-            }
+
             OutlinedTextField(
                 value = line.usage,
                 onValueChange = { onChange(line.copy(usage = it)) },
@@ -377,6 +460,7 @@ private fun RequestLineEditorCard(
                 placeholder = { Text("مثال: تأسيس كهرباء الدور الأول") },
                 singleLine = true,
             )
+
             OutlinedTextField(
                 value = line.description,
                 onValueChange = { onChange(line.copy(description = it)) },
@@ -422,101 +506,52 @@ private fun ItemPickerDialog(
     onSelect: (ItemEntity) -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
-    var selectedCategoryId by remember { mutableStateOf<Long?>(null) }
-    var categoryMenuOpen by remember { mutableStateOf(false) }
 
-    val categoryById = remember(categories) { categories.associateBy { it.id } }
-    val filtered = remember(items, query, selectedCategoryId) {
+    val filtered = remember(items, query) {
         items.filter { item ->
-            val categoryMatches = selectedCategoryId == null || item.categoryId == selectedCategoryId
-            val queryMatches = query.isBlank() ||
+            query.isBlank() ||
                 item.name.contains(query, true) ||
                 item.code.contains(query, true) ||
                 item.brand.contains(query, true)
-            categoryMatches && queryMatches
         }
     }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("اختيار صنف من الدليل") },
+        title = { Text("اختيار الصنف") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Box(Modifier.fillMaxWidth()) {
-                    OutlinedButton(
-                        onClick = { categoryMenuOpen = true },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Icon(Icons.Outlined.Category, null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            selectedCategoryId?.let { categoryById[it]?.name } ?: "كل الأقسام",
-                            modifier = Modifier.weight(1f),
-                        )
-                        Icon(Icons.Outlined.KeyboardArrowDown, null)
-                    }
-                    DropdownMenu(
-                        expanded = categoryMenuOpen,
-                        onDismissRequest = { categoryMenuOpen = false },
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("كل الأقسام") },
-                            onClick = {
-                                selectedCategoryId = null
-                                categoryMenuOpen = false
-                            },
-                        )
-                        categories.forEach { category ->
-                            DropdownMenuItem(
-                                text = { Text(category.name) },
-                                onClick = {
-                                    selectedCategoryId = category.id
-                                    categoryMenuOpen = false
-                                },
-                            )
-                        }
-                    }
-                }
-
                 OutlinedTextField(
-                    query,
-                    { query = it },
+                    value = query,
+                    onValueChange = { query = it },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("بحث") },
-                    placeholder = { Text("اسم الصنف أو الكود أو الماركة") },
+                    label = { Text("بحث في الأصناف") },
                     leadingIcon = { Icon(Icons.Outlined.Search, null) },
                     singleLine = true,
                 )
 
                 if (filtered.isEmpty()) {
-                    Text("لا يوجد صنف مطابق. يمكنك كتابة الصنف في الكشف وسيُحفظ في قسم «أخرى»، ثم تعديله من دليل الأصناف.")
+                    Text("لا توجد أصناف مطابقة. أضف الصنف من «دليل الأصناف» ثم ارجع للكشف.")
                 } else {
                     LazyColumn(
-                        Modifier.heightIn(max = 360.dp),
+                        Modifier.heightIn(max = 380.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         itemsIndexed(filtered, key = { _, item -> item.id }) { _, item ->
                             Card(onClick = { onSelect(item) }) {
                                 Row(
                                     Modifier.fillMaxWidth().padding(12.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     Column(Modifier.weight(1f)) {
                                         Text(item.name, style = MaterialTheme.typography.titleSmall)
-                                        Text(
-                                            buildString {
-                                                append(item.code)
-                                                item.categoryId?.let { id ->
-                                                    categoryById[id]?.name?.let { name ->
-                                                        append("  •  ")
-                                                        append(name)
-                                                    }
-                                                }
-                                            },
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
+                                        if (item.specification.isNotBlank()) {
+                                            Text(
+                                                item.specification,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
                                     }
                                     Text(item.defaultUnit, style = MaterialTheme.typography.labelLarge)
                                 }
@@ -527,19 +562,24 @@ private fun ItemPickerDialog(
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("إلغاء") }
+        },
     )
 }
 
 private fun validateSheet(projectId: Long?, sheetNumber: String, lines: List<EditableLineUi>): String? {
     if (projectId == null) return "اختار المشروع أولًا."
     if (sheetNumber.isBlank()) return "اكتب رقم الكشف."
-    val validLines = lines.filter { it.itemName.isNotBlank() || it.quantity.isNotBlank() || it.unit.isNotBlank() }
+    val validLines = lines.filter { it.existingItemId != null || it.quantity.isNotBlank() }
     if (validLines.isEmpty()) return "أضف بندًا واحدًا على الأقل."
     val invalid = validLines.firstOrNull {
-        it.itemName.isBlank() || (it.quantity.toDoubleOrNull() ?: 0.0) <= 0.0 || it.unit.isBlank()
+        it.categoryId == null ||
+            it.existingItemId == null ||
+            (it.quantity.toDoubleOrNull() ?: 0.0) <= 0.0 ||
+            it.unit.isBlank()
     }
-    if (invalid != null) return "راجع البنود: اسم الصنف والكمية والوحدة مطلوبة لكل بند."
+    if (invalid != null) return "راجع البنود: اختار القسم والصنف وأدخل الكمية لكل بند."
     return null
 }
 
