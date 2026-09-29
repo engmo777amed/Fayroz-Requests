@@ -46,7 +46,8 @@ class FayrozRepository(private val database: FayrozDatabase) {
 
         StarterCatalog.items.forEach { starter ->
             val normalized = ImportText.normalizeItemName(starter.name)
-            if (dao.findItemByNormalizedName(normalized) == null) {
+            val existing = dao.findItemByNormalizedName(normalized)
+            if (existing == null) {
                 dao.insertItem(
                     ItemEntity(
                         code = generateItemCode(),
@@ -54,6 +55,13 @@ class FayrozRepository(private val database: FayrozDatabase) {
                         normalizedName = normalized,
                         categoryId = categoryIds[starter.category],
                         defaultUnit = starter.unit,
+                        specification = starter.specification,
+                    )
+                )
+            } else if (existing.specification.isBlank() && starter.specification.isNotBlank()) {
+                dao.updateItem(
+                    existing.copy(
+                        categoryId = existing.categoryId ?: categoryIds[starter.category],
                         specification = starter.specification,
                     )
                 )
