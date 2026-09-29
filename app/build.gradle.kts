@@ -6,12 +6,12 @@ plugins {
 
 android {
     namespace = "com.fayroz.requests"
-    compileSdk = 37
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.fayroz.requests"
         minSdk = 26
-        targetSdk = 37
+        targetSdk = 36
         versionCode = 5
         versionName = "0.5.0"
     }
