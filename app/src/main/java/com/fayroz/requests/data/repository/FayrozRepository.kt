@@ -55,6 +55,52 @@ class FayrozRepository(private val database: FayrozDatabase) {
         )
     }
 
+    suspend fun updateItemDetails(
+        itemId: Long,
+        name: String,
+        unit: String,
+        brand: String = "",
+        specification: String = "",
+    ): String? {
+        val current = dao.getItem(itemId) ?: return "الصنف غير موجود."
+        val cleanName = name.trim()
+        val cleanUnit = unit.trim()
+        if (cleanName.isBlank()) return "اسم الصنف مطلوب."
+        if (cleanUnit.isBlank()) return "الوحدة مطلوبة."
+
+        val normalized = ImportText.normalizeItemName(cleanName)
+        val duplicate = dao.findItemByNormalizedName(normalized)
+        if (duplicate != null && duplicate.id != itemId) {
+            return "يوجد صنف آخر بنفس الاسم في دليل الأصناف."
+        }
+
+        dao.updateItem(
+            current.copy(
+                name = cleanName,
+                normalizedName = normalized,
+                defaultUnit = cleanUnit,
+                brand = brand.trim(),
+                specification = specification.trim(),
+            )
+        )
+        return null
+    }
+
+    suspend fun deleteItem(itemId: Long): String? {
+        val item = dao.getItem(itemId) ?: return "الصنف غير موجود."
+        val requestCount = dao.countRequestLinesForItem(itemId)
+        val priceCount = dao.countPricesForItem(itemId)
+        if (requestCount > 0 || priceCount > 0) {
+            val linked = buildList {
+                if (requestCount > 0) add("$requestCount بند كشف")
+                if (priceCount > 0) add("$priceCount سعر محفوظ")
+            }.joinToString(" و ")
+            return "لا يمكن حذف الصنف لأنه مرتبط بـ $linked. يمكنك تعديل بياناته بدل الحذف."
+        }
+        dao.deleteItem(item)
+        return null
+    }
+
     suspend fun addSupplier(
         name: String,
         phone: String = "",
