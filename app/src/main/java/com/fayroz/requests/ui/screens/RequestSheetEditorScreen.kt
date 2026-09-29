@@ -297,7 +297,6 @@ fun RequestSheetEditorScreen(
                     RequestLineEditorCard(
                         index = index,
                         line = line,
-                        item = line.existingItemId?.let(itemById::get),
                         onChange = { lines[index] = it },
                         onDelete = { lines.removeAt(index) },
                     )
@@ -374,7 +373,6 @@ fun RequestSheetEditorScreen(
 private fun RequestLineEditorCard(
     index: Int,
     line: EditableLineUi,
-    item: ItemEntity?,
     onChange: (EditableLineUi) -> Unit,
     onDelete: () -> Unit,
 ) {
