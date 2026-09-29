@@ -10,7 +10,7 @@ class FayrozRequestsApp : Application() {
 
     suspend fun ensureStarterCatalogOnce() {
         val prefs = getSharedPreferences("fayroz_requests_setup", MODE_PRIVATE)
-        if (prefs.getBoolean("starter_catalog_v2_seeded", false)) return
+        if (prefs.getBoolean("starter_catalog_v3_seeded", false)) return
 
         repository.ensureStarterCatalog()
         prefs.edit().putBoolean("starter_catalog_v1_seeded", true).apply()
