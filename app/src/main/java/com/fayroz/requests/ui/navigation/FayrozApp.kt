@@ -26,9 +26,8 @@ data class MainDestination(
 
 private val destinations = listOf(
     MainDestination("home", "الرئيسية", Icons.Outlined.Home),
-    MainDestination("projects", "المشروعات", Icons.Outlined.Business),
     MainDestination("sheets", "الكشوف", Icons.Outlined.ReceiptLong),
-    MainDestination("pricing", "الأسعار", Icons.Outlined.PriceCheck),
+    MainDestination("items", "دليل الأصناف", Icons.Outlined.Inventory2),
     MainDestination("suppliers", "الموردون", Icons.Outlined.Storefront),
 )
 
