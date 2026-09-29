@@ -17,15 +17,19 @@ import com.fayroz.requests.data.repository.FayrozRepository
 import kotlinx.coroutines.launch
 
 @Composable
-fun ProjectsScreen(repository: FayrozRepository) {
+fun ProjectsScreen(repository: FayrozRepository, onBack: (() -> Unit)? = null) {
     val projects by repository.projects.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
     var editingProject by remember { mutableStateOf<ProjectEntity?>(null) }
     var showAdd by remember { mutableStateOf(false) }
     var deleteTarget by remember { mutableStateOf<ProjectEntity?>(null) }
 
-    Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        ScreenHeader("المشروعات", "كل كشف يتبع مشروعًا واحدًا")
+    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        FayrozDetailHeader(
+            title = "المشروعات",
+            subtitle = "كل كشف يتبع مشروعًا واحدًا",
+            onBack = onBack,
+        )
         PrimaryAction("إضافة مشروع", Icons.Outlined.AddBusiness) { showAdd = true }
 
         if (projects.isEmpty()) {
