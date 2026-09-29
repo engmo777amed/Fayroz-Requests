@@ -1,5 +1,7 @@
 package com.fayroz.requests.ui.screens
 
+import android.widget.Toast
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -15,6 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -26,6 +29,7 @@ import com.fayroz.requests.data.model.RequestLineDraft
 import com.fayroz.requests.data.model.RequestSheetDraft
 import com.fayroz.requests.data.repository.FayrozRepository
 import com.fayroz.requests.data.repository.StarterCatalog
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private data class EditableLineUi(
@@ -53,6 +57,7 @@ fun RequestSheetEditorScreen(
     val allCategories by repository.categories.collectAsState(initial = emptyList())
     val allItems by repository.items.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     val categories = remember(allCategories) {
         allCategories.filterNot { it.name in StarterCatalog.hiddenCategories }
@@ -68,10 +73,12 @@ fun RequestSheetEditorScreen(
     var sheetNumber by remember { mutableStateOf("") }
     var trade by remember { mutableStateOf("") }
     var craftsmanName by remember { mutableStateOf("") }
+    var workLocation by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
     var sheetDate by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var isLoading by remember { mutableStateOf(sheetId != null) }
     var isSaving by remember { mutableStateOf(false) }
+    var saveConfirmed by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var projectPickerOpen by remember { mutableStateOf(false) }
     var multiPickerOpen by remember { mutableStateOf(false) }
@@ -87,6 +94,7 @@ fun RequestSheetEditorScreen(
                 sheetNumber = draft.sheetNumber
                 trade = draft.trade
                 craftsmanName = draft.craftsmanName
+                workLocation = draft.workLocation
                 notes = draft.notes
                 sheetDate = draft.sheetDate
                 lines.clear()
@@ -202,6 +210,7 @@ fun RequestSheetEditorScreen(
                                         sheetDate = sheetDate,
                                         trade = trade,
                                         craftsmanName = craftsmanName.trim(),
+                                        workLocation = workLocation.trim(),
                                         notes = notes,
                                         lines = lines.map { line ->
                                             RequestLineDraft(
@@ -210,7 +219,7 @@ fun RequestSheetEditorScreen(
                                                 quantity = line.quantity.toDouble(),
                                                 unit = line.unit,
                                                 brand = "",
-                                                usage = line.usage.trim(),
+                                                usage = "",
                                                 lineDescription = line.description,
                                                 notes = line.notes,
                                             )
@@ -218,6 +227,9 @@ fun RequestSheetEditorScreen(
                                     )
                                 )
                             }.onSuccess {
+                                saveConfirmed = true
+                                Toast.makeText(context, "تم حفظ الكشف بنجاح ✓", Toast.LENGTH_SHORT).show()
+                                delay(650)
                                 onDone()
                             }.onFailure {
                                 errorMessage = friendlySheetSaveError(it)
@@ -228,13 +240,13 @@ fun RequestSheetEditorScreen(
                 },
                 enabled = !isSaving,
             ) {
-                if (isSaving) {
-                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                } else {
-                    Icon(Icons.Outlined.Save, null)
+                when {
+                    saveConfirmed -> Icon(Icons.Outlined.CheckCircle, null)
+                    isSaving -> CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                    else -> Icon(Icons.Outlined.Save, null)
                 }
                 Spacer(Modifier.width(6.dp))
-                Text("حفظ")
+                Text(if (saveConfirmed) "تم الحفظ" else "حفظ")
             }
         }
 
@@ -248,27 +260,41 @@ fun RequestSheetEditorScreen(
             item {
                 Card {
                     Column(
-                        Modifier.fillMaxWidth().padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        Modifier.fillMaxWidth().padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(7.dp),
                     ) {
                         val project = projects.firstOrNull { it.id == selectedProjectId }
                         OutlinedButton(
                             onClick = { projectPickerOpen = true },
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().height(44.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp),
                         ) {
-                            Icon(Icons.Outlined.Business, null)
-                            Spacer(Modifier.width(8.dp))
-                            Text(project?.name ?: "اختيار المشروع", modifier = Modifier.weight(1f))
-                            Icon(Icons.Outlined.KeyboardArrowDown, null)
+                            Icon(Icons.Outlined.Business, null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(project?.name ?: "اختيار المشروع", modifier = Modifier.weight(1f), maxLines = 1)
+                            Icon(Icons.Outlined.KeyboardArrowDown, null, modifier = Modifier.size(18.dp))
                         }
 
-                        OutlinedTextField(
-                            value = craftsmanName,
-                            onValueChange = { craftsmanName = it },
-                            modifier = Modifier.fillMaxWidth(),
-                            label = { Text("اسم الصنايعي / اللي باعت الطلب") },
-                            singleLine = true,
-                        )
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(7.dp),
+                        ) {
+                            OutlinedTextField(
+                                value = craftsmanName,
+                                onValueChange = { craftsmanName = it },
+                                modifier = Modifier.weight(1f),
+                                label = { Text("الصنايعي") },
+                                singleLine = true,
+                            )
+                            OutlinedTextField(
+                                value = workLocation,
+                                onValueChange = { workLocation = it },
+                                modifier = Modifier.weight(1f),
+                                label = { Text("المكان (اختياري)") },
+                                placeholder = { Text("حمام / مطبخ") },
+                                singleLine = true,
+                            )
+                        }
                     }
                 }
             }
@@ -390,7 +416,7 @@ private fun RequestLineEditorCard(
         ) {
             Text(
                 text = "${index + 1}. ${line.itemName}",
-                modifier = Modifier.weight(1.15f),
+                modifier = Modifier.weight(1.65f),
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1,
             )
@@ -404,15 +430,8 @@ private fun RequestLineEditorCard(
                 },
                 placeholder = "العدد",
                 suffix = line.unit,
-                modifier = Modifier.weight(0.62f),
+                modifier = Modifier.weight(0.70f),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            )
-
-            CompactLineField(
-                value = line.usage,
-                onValueChange = { onChange(line.copy(usage = it)) },
-                placeholder = "المكان",
-                modifier = Modifier.weight(0.80f),
             )
 
             IconButton(
