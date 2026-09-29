@@ -31,6 +31,8 @@ class FayrozRepository(private val database: FayrozDatabase) {
     suspend fun updateProject(project: ProjectEntity) = dao.updateProject(project)
     suspend fun deleteProject(project: ProjectEntity) = dao.deleteProject(project)
 
+    suspend fun hasAnyItems(): Boolean = dao.countItems() > 0
+
     suspend fun ensureStarterCatalog() = database.withTransaction {
         val categoryIds = mutableMapOf<String, Long>()
         StarterCatalog.categories.forEach { categoryName ->
