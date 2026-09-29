@@ -4,6 +4,8 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+val generatedLauncherResDir = layout.buildDirectory.dir("generated/launcherIcon/res")
+
 android {
     namespace = "com.fayroz.requests"
     compileSdk = 36
@@ -20,6 +22,8 @@ android {
         compose = true
         buildConfig = true
     }
+
+    sourceSets["main"].res.srcDir(generatedLauncherResDir)
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -54,4 +58,27 @@ dependencies {
     kapt("androidx.room:room-compiler:2.8.5")
 
     testImplementation("junit:junit:4.13.2")
+}
+
+
+val launcherIconParts = listOf(
+    layout.projectDirectory.file("icon/ic_launcher_art.b64.0").asFile,
+    layout.projectDirectory.file("icon/ic_launcher_art.b64.1").asFile,
+)
+
+val generateLauncherIcon by tasks.registering {
+    val outputFile = generatedLauncherResDir.map { it.file("drawable-nodpi/ic_launcher_art.webp").asFile }
+    inputs.files(launcherIconParts)
+    outputs.file(outputFile)
+
+    doLast {
+        val target = outputFile.get()
+        target.parentFile.mkdirs()
+        val encoded = launcherIconParts.joinToString("") { it.readText().trim() }
+        target.writeBytes(java.util.Base64.getDecoder().decode(encoded))
+    }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn(generateLauncherIcon)
 }
