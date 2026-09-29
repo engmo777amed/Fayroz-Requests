@@ -87,3 +87,46 @@ data class ItemPriceHistoryDetail(
     val source: PriceSource,
     val notes: String,
 )
+
+
+data class PricingCopySummary(
+    val copyId: Long,
+    val sheetId: Long,
+    val placeName: String,
+    val quoteDate: Long,
+    val lineCount: Int,
+    val pricedCount: Int,
+    val total: Double,
+)
+
+data class PricingCopyLineDetail(
+    val copyLineId: Long,
+    val copyId: Long,
+    val requestLineId: Long,
+    val itemId: Long,
+    val itemName: String,
+    val categoryId: Long?,
+    val quantity: Double,
+    val unit: String,
+    val usage: String,
+    val brand: String,
+    val unitPrice: Double?,
+)
+
+data class PricingCopyDetail(
+    val copy: PricingCopyEntity,
+    val sheet: RequestSheetEntity,
+    val project: ProjectEntity,
+    val lines: List<PricingCopyLineDetail>,
+) {
+    val total: Double
+        get() = lines.sumOf { (it.unitPrice ?: 0.0) * it.quantity }
+    val pricedCount: Int
+        get() = lines.count { it.unitPrice != null }
+}
+
+data class PricingCopiesComparison(
+    val sheet: RequestSheetEntity,
+    val project: ProjectEntity,
+    val copies: List<PricingCopyDetail>,
+)
