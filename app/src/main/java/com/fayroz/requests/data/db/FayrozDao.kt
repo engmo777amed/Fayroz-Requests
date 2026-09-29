@@ -259,4 +259,71 @@ interface FayrozDao {
 
     @Query("SELECT * FROM supplier_discount_rules WHERE supplierId = :supplierId AND active = 1 ORDER BY id DESC")
     suspend fun getActiveDiscountRules(supplierId: Long): List<SupplierDiscountRuleEntity>
+
+
+    @Query("SELECT * FROM category_brands ORDER BY name COLLATE NOCASE")
+    fun observeCategoryBrands(): Flow<List<CategoryBrandEntity>>
+
+    @Query("SELECT * FROM category_brands WHERE categoryId = :categoryId ORDER BY name COLLATE NOCASE")
+    suspend fun getCategoryBrands(categoryId: Long): List<CategoryBrandEntity>
+
+    @Query("SELECT * FROM category_brands WHERE categoryId = :categoryId AND name = :name COLLATE NOCASE LIMIT 1")
+    suspend fun findCategoryBrand(categoryId: Long, name: String): CategoryBrandEntity?
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertCategoryBrand(brand: CategoryBrandEntity): Long
+
+    @Query(
+        """
+        SELECT pc.id AS copyId,
+               pc.sheetId AS sheetId,
+               pc.placeName AS placeName,
+               pc.quoteDate AS quoteDate,
+               COUNT(pcl.id) AS lineCount,
+               SUM(CASE WHEN pcl.unitPrice IS NOT NULL THEN 1 ELSE 0 END) AS pricedCount,
+               COALESCE(SUM(CASE WHEN pcl.unitPrice IS NULL THEN 0 ELSE pcl.unitPrice * rl.quantity END), 0) AS total
+        FROM pricing_copies pc
+        LEFT JOIN pricing_copy_lines pcl ON pcl.copyId = pc.id
+        LEFT JOIN request_lines rl ON rl.id = pcl.requestLineId
+        WHERE pc.sheetId = :sheetId
+        GROUP BY pc.id
+        ORDER BY pc.createdAt DESC, pc.id DESC
+        """
+    )
+    fun observePricingCopies(sheetId: Long): Flow<List<PricingCopySummary>>
+
+    @Query("SELECT * FROM pricing_copies WHERE id = :copyId LIMIT 1")
+    suspend fun getPricingCopy(copyId: Long): PricingCopyEntity?
+
+    @Insert suspend fun insertPricingCopy(copy: PricingCopyEntity): Long
+    @Delete suspend fun deletePricingCopy(copy: PricingCopyEntity)
+
+    @Insert suspend fun insertPricingCopyLines(lines: List<PricingCopyLineEntity>)
+
+    @Query("SELECT * FROM pricing_copy_lines WHERE copyId = :copyId AND requestLineId = :requestLineId LIMIT 1")
+    suspend fun getPricingCopyLine(copyId: Long, requestLineId: Long): PricingCopyLineEntity?
+
+    @Update suspend fun updatePricingCopyLine(line: PricingCopyLineEntity)
+
+    @Query(
+        """
+        SELECT pcl.id AS copyLineId,
+               pcl.copyId AS copyId,
+               pcl.requestLineId AS requestLineId,
+               rl.itemId AS itemId,
+               i.name AS itemName,
+               i.categoryId AS categoryId,
+               rl.quantity AS quantity,
+               rl.unit AS unit,
+               rl.usage AS usage,
+               pcl.brand AS brand,
+               pcl.unitPrice AS unitPrice
+        FROM pricing_copy_lines pcl
+        INNER JOIN request_lines rl ON rl.id = pcl.requestLineId
+        INNER JOIN items i ON i.id = rl.itemId
+        WHERE pcl.copyId = :copyId
+        ORDER BY rl.id
+        """
+    )
+    suspend fun getPricingCopyLineDetails(copyId: Long): List<PricingCopyLineDetail>
 }
