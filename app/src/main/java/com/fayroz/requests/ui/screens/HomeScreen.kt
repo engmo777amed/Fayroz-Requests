@@ -33,7 +33,7 @@ fun HomeScreen(
             FeatureCard("التسعير", "مقارنة أسعار الموردين والخصم", Icons.Outlined.PriceCheck, onPricing, Modifier.weight(1f))
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            FeatureCard("الأصناف", "قاعدة موحدة للأسعار والكميات", Icons.Outlined.Inventory2, onItems, Modifier.weight(1f))
+            FeatureCard("دليل الأصناف", "أصناف مرتبة للكشوف والأسعار", Icons.Outlined.Inventory2, onItems, Modifier.weight(1f))
             FeatureCard("الموردون", "المعتمدون وقوائم الأسعار", Icons.Outlined.Storefront, onSuppliers, Modifier.weight(1f))
         }
 
