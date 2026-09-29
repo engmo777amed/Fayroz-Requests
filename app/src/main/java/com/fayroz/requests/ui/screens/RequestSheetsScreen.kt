@@ -40,7 +40,7 @@ fun RequestSheetsScreen(
     }
 
     Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        ScreenHeader("كشوف الطلبات", "المشروع ← الكشف ← البنود والكميات والاستخدام")
+        ScreenHeader("كشوف الطلبات", "المشروع ← الكشف ← البنود والكميات")
         PrimaryAction("كشف طلبات جديد", Icons.Outlined.AddCircle, onNewSheet)
         OutlinedTextField(
             value = query,
@@ -52,7 +52,7 @@ fun RequestSheetsScreen(
         )
 
         if (filtered.isEmpty()) {
-            EmptyState(Icons.Outlined.ReceiptLong, "لا توجد كشوف بعد", "أدخل كشف الصنايعي كما وصلك، وحدد الكمية والاستخدام لكل بند.")
+            EmptyState(Icons.Outlined.ReceiptLong, "لا توجد كشوف بعد", "اختار الأصناف وحدد الكمية، ومكان الاستخدام اختياري.")
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 items(filtered, key = { it.id }) { sheet ->
