@@ -1,16 +1,19 @@
 package com.fayroz.requests.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -239,8 +242,8 @@ fun RequestSheetEditorScreen(
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(14.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             item {
                 Card {
@@ -291,11 +294,10 @@ fun RequestSheetEditorScreen(
                 }
             } else {
                 itemsIndexed(lines, key = { _, line -> line.localId }) { index, line ->
-                    val item = line.existingItemId?.let(itemById::get)
                     RequestLineEditorCard(
                         index = index,
                         line = line,
-                        item = item,
+                        item = line.existingItemId?.let(itemById::get),
                         onChange = { lines[index] = it },
                         onDelete = { lines.removeAt(index) },
                     )
@@ -376,62 +378,114 @@ private fun RequestLineEditorCard(
     onChange: (EditableLineUi) -> Unit,
     onDelete: () -> Unit,
 ) {
-    Card {
-        Column(
-            Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+    Surface(
+        shape = MaterialTheme.shapes.small,
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        "${index + 1}. ${line.itemName}",
-                        style = MaterialTheme.typography.titleSmall,
-                    )
-                    item?.specification
-                        ?.takeIf { it.isNotBlank() }
-                        ?.let {
-                            Text(
-                                it,
-                                maxLines = 1,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                }
-                IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Outlined.DeleteOutline, "حذف الصنف")
-                }
-            }
+            Text(
+                text = "${index + 1}. ${line.itemName}",
+                modifier = Modifier.weight(1.15f),
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+            )
 
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            CompactLineField(
+                value = line.quantity,
+                onValueChange = { value ->
+                    if (value.isEmpty() || value.matches(Regex("\\d*(\\.\\d*)?"))) {
+                        onChange(line.copy(quantity = value))
+                    }
+                },
+                placeholder = "العدد",
+                suffix = line.unit,
+                modifier = Modifier.weight(0.62f),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            )
+
+            CompactLineField(
+                value = line.usage,
+                onValueChange = { onChange(line.copy(usage = it)) },
+                placeholder = "المكان",
+                modifier = Modifier.weight(0.80f),
+            )
+
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier.size(30.dp),
             ) {
-                OutlinedTextField(
-                    value = line.quantity,
-                    onValueChange = { value ->
-                        if (value.isEmpty() || value.matches(Regex("\\d*(\\.\\d*)?"))) {
-                            onChange(line.copy(quantity = value))
-                        }
-                    },
-                    modifier = Modifier.weight(0.42f),
-                    label = { Text("الكمية *") },
-                    suffix = { if (line.unit.isNotBlank()) Text(line.unit) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                )
-
-                OutlinedTextField(
-                    value = line.usage,
-                    onValueChange = { onChange(line.copy(usage = it)) },
-                    modifier = Modifier.weight(0.58f),
-                    label = { Text("المكان (اختياري)") },
-                    placeholder = { Text("حمام / مطبخ") },
-                    singleLine = true,
+                Icon(
+                    Icons.Outlined.Close,
+                    contentDescription = "حذف البند",
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.error,
                 )
             }
         }
     }
+}
+
+@Composable
+private fun CompactLineField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    modifier: Modifier = Modifier,
+    suffix: String = "",
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+) {
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier.height(38.dp),
+        singleLine = true,
+        keyboardOptions = keyboardOptions,
+        textStyle = MaterialTheme.typography.bodySmall.copy(
+            color = MaterialTheme.colorScheme.onSurface,
+        ),
+        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+        decorationBox = { innerTextField ->
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                shape = MaterialTheme.shapes.extraSmall,
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(Modifier.weight(1f)) {
+                        if (value.isBlank()) {
+                            Text(
+                                placeholder,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                            )
+                        }
+                        innerTextField()
+                    }
+                    if (suffix.isNotBlank()) {
+                        Spacer(Modifier.width(3.dp))
+                        Text(
+                            suffix,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
+        },
+    )
 }
 
 @Composable
