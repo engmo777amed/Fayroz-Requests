@@ -102,6 +102,7 @@ data class RequestSheetEntity(
     val sheetDate: Long = System.currentTimeMillis(),
     val trade: String = "",
     val craftsmanName: String = "",
+    val workLocation: String = "",
     val attachmentUri: String? = null,
     val notes: String = "",
     val createdAt: Long = System.currentTimeMillis(),
