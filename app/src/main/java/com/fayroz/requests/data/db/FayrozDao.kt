@@ -42,6 +42,9 @@ interface FayrozDao {
     @Query("SELECT * FROM items ORDER BY name COLLATE NOCASE")
     suspend fun getItems(): List<ItemEntity>
 
+    @Query("SELECT COUNT(*) FROM items")
+    suspend fun countItems(): Int
+
     @Query("SELECT * FROM items WHERE normalizedName LIKE '%' || :query || '%' OR code LIKE '%' || :query || '%' ORDER BY name LIMIT 50")
     fun searchItems(query: String): Flow<List<ItemEntity>>
 
