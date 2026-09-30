@@ -211,6 +211,9 @@ interface FayrozDao {
     @Query("DELETE FROM supplier_prices WHERE sourceReference LIKE :prefix || '%'")
     suspend fun deletePricesBySourceReferencePrefix(prefix: String)
 
+    @Query("DELETE FROM supplier_prices WHERE sourceReference = :sourceReference")
+    suspend fun deletePriceBySourceReference(sourceReference: String)
+
     @Query(
         """
         SELECT sp.id AS priceId,
