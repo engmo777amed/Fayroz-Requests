@@ -516,7 +516,11 @@ private fun ItemEditorDialog(
     ) -> Unit,
 ) {
     var marketName by remember(item?.id) {
-        mutableStateOf(item?.marketName?.ifBlank { StarterCatalog.marketName(item.name) }.orEmpty())
+        mutableStateOf(
+            item?.let { current ->
+                current.marketName.ifBlank { StarterCatalog.marketName(current.name) }
+            }.orEmpty()
+        )
     }
     var name by remember(item?.id) { mutableStateOf(item?.name.orEmpty()) }
     var unit by remember(item?.id) { mutableStateOf(item?.defaultUnit.orEmpty()) }
