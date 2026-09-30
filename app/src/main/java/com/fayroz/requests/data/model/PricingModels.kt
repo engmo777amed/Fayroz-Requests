@@ -93,11 +93,17 @@ data class PricingCopySummary(
     val copyId: Long,
     val sheetId: Long,
     val placeName: String,
+    val supplierId: Long?,
+    val supplierName: String?,
+    val quoteNumber: String,
     val quoteDate: Long,
+    val notes: String,
     val lineCount: Int,
     val pricedCount: Int,
     val total: Double,
-)
+) {
+    val complete: Boolean get() = lineCount > 0 && pricedCount == lineCount
+}
 
 data class PricingCopyLineDetail(
     val copyLineId: Long,
@@ -123,10 +129,44 @@ data class PricingCopyDetail(
         get() = lines.sumOf { (it.unitPrice ?: 0.0) * it.quantity }
     val pricedCount: Int
         get() = lines.count { it.unitPrice != null }
+    val complete: Boolean
+        get() = lines.isNotEmpty() && pricedCount == lines.size
 }
 
 data class PricingCopiesComparison(
     val sheet: RequestSheetEntity,
     val project: ProjectEntity,
     val copies: List<PricingCopyDetail>,
-)
+) {
+    val completeCopies: List<PricingCopyDetail> get() = copies.filter { it.complete }
+    val lowestCompleteTotal: Double? get() = completeCopies.minOfOrNull { it.total }
+    val highestCompleteTotal: Double? get() = completeCopies.maxOfOrNull { it.total }
+    val completeRangeSaving: Double? get() {
+        val low = lowestCompleteTotal ?: return null
+        val high = highestCompleteTotal ?: return null
+        return high - low
+    }
+    val bestMixTotal: Double? get() {
+        val base = copies.firstOrNull()?.lines.orEmpty()
+        if (base.isEmpty()) return null
+        var total = 0.0
+        for (baseLine in base) {
+            val prices = copies.mapNotNull { copy ->
+                copy.lines.firstOrNull { it.requestLineId == baseLine.requestLineId }?.unitPrice
+            }
+            val lowest = prices.minOrNull() ?: return null
+            total += lowest * baseLine.quantity
+        }
+        return total
+    }
+    fun cheapestLineCount(copyId: Long): Int {
+        val target = copies.firstOrNull { it.copy.id == copyId } ?: return 0
+        return target.lines.count { targetLine ->
+            val price = targetLine.unitPrice ?: return@count false
+            val lowest = copies.mapNotNull { copy ->
+                copy.lines.firstOrNull { it.requestLineId == targetLine.requestLineId }?.unitPrice
+            }.minOrNull()
+            lowest != null && price == lowest
+        }
+    }
+}
