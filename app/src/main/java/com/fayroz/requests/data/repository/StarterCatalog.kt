@@ -199,6 +199,11 @@ object StarterCatalog {
 
     fun marketLabel(name: String): String = marketAlias(name)
 
+    fun marketName(name: String): String {
+        val alias = marketAlias(name).substringBefore(" / ").trim()
+        return alias.ifBlank { name }
+    }
+
     private fun item(category: String, name: String, unit: String, specification: String = ""): StarterItem {
         val alias = marketAlias(name)
         val finalSpec = listOfNotNull(
