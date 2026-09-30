@@ -152,6 +152,11 @@ interface FayrozDao {
     @Delete suspend fun deleteSheet(sheet: RequestSheetEntity)
 
     @Insert suspend fun insertRequestLines(lines: List<RequestLineEntity>)
+    @Insert suspend fun insertRequestLine(line: RequestLineEntity): Long
+    @Update suspend fun updateRequestLine(line: RequestLineEntity)
+
+    @Query("DELETE FROM request_lines WHERE id IN (:lineIds)")
+    suspend fun deleteRequestLinesByIds(lineIds: List<Long>)
 
     @Query("DELETE FROM request_lines WHERE sheetId = :sheetId")
     suspend fun deleteLinesForSheet(sheetId: Long)
@@ -318,6 +323,9 @@ interface FayrozDao {
 
     @Query("SELECT * FROM pricing_copies WHERE id = :copyId LIMIT 1")
     suspend fun getPricingCopy(copyId: Long): PricingCopyEntity?
+
+    @Query("SELECT * FROM pricing_copies WHERE sheetId = :sheetId ORDER BY id")
+    suspend fun getPricingCopies(sheetId: Long): List<PricingCopyEntity>
 
     @Insert suspend fun insertPricingCopy(copy: PricingCopyEntity): Long
     @Update suspend fun updatePricingCopy(copy: PricingCopyEntity)
