@@ -766,6 +766,7 @@ class FayrozRepository(private val database: FayrozDatabase) {
             trade = sheet.trade,
             craftsmanName = sheet.craftsmanName,
             workLocation = sheet.workLocation,
+            attachmentUri = sheet.attachmentUri,
             notes = sheet.notes,
             lines = lines,
         )
@@ -802,6 +803,7 @@ class FayrozRepository(private val database: FayrozDatabase) {
                     trade = draft.trade.trim(),
                     craftsmanName = draft.craftsmanName.trim(),
                     workLocation = draft.workLocation.trim(),
+                    attachmentUri = draft.attachmentUri,
                     notes = draft.notes.trim(),
                 )
             )
@@ -825,6 +827,7 @@ class FayrozRepository(private val database: FayrozDatabase) {
                     trade = draft.trade.trim(),
                     craftsmanName = draft.craftsmanName.trim(),
                     workLocation = draft.workLocation.trim(),
+                    attachmentUri = draft.attachmentUri,
                     notes = draft.notes.trim(),
                 )
             )
