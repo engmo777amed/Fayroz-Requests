@@ -26,6 +26,7 @@ fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}
 
     var showAdd by remember { mutableStateOf(false) }
     var showCompanies by remember { mutableStateOf(false) }
+    var showCategoryOrder by remember { mutableStateOf(false) }
     var editingItem by remember { mutableStateOf<ItemEntity?>(null) }
     var deletingItem by remember { mutableStateOf<ItemEntity?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
@@ -33,21 +34,20 @@ fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}
     var selectedCategoryId by remember { mutableStateOf<Long?>(null) }
 
     val visibleCategories = remember(categories) {
-        categories
-            .filterNot { it.name in StarterCatalog.hiddenCategories }
-            .sortedWith(compareBy<CategoryEntity> { StarterCatalog.categoryRank(it.name) }.thenBy { it.name })
+        categories.filterNot { it.name in StarterCatalog.hiddenCategories }
     }
     val visibleCategoryIds = remember(visibleCategories) { visibleCategories.map { it.id }.toSet() }
-    val categoryRankById = remember(visibleCategories) {
-        visibleCategories.associate { it.id to StarterCatalog.categoryRank(it.name) }
+    val categoryOrderById = remember(visibleCategories) {
+        visibleCategories.mapIndexed { index, category -> category.id to index }.toMap()
     }
-    val visibleItems = remember(allItems, visibleCategoryIds, categoryRankById) {
+    val visibleItems = remember(allItems, visibleCategoryIds, categoryOrderById) {
         allItems
             .filter { it.categoryId == null || it.categoryId in visibleCategoryIds }
             .sortedWith(
-                compareBy<ItemEntity> { categoryRankById[it.categoryId] ?: Int.MAX_VALUE }
+                compareBy<ItemEntity> { categoryOrderById[it.categoryId] ?: Int.MAX_VALUE }
                     .thenBy { StarterCatalog.itemFamilyRank(it.name) }
                     .thenBy { StarterCatalog.firstMarketNumber(it.name) }
+                    .thenBy { it.marketName.ifBlank { StarterCatalog.marketName(it.name) } }
                     .thenBy { it.name }
             )
     }
@@ -58,6 +58,7 @@ fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}
             val categoryName = item.categoryId?.let { categoryById[it]?.name }.orEmpty()
             val queryMatches = query.isBlank() ||
                 item.name.contains(query, true) ||
+                item.marketName.contains(query, true) ||
                 item.code.contains(query, true) ||
                 item.specification.contains(query, true) ||
                 StarterCatalog.marketLabel(item.name).contains(query, true) ||
@@ -88,10 +89,17 @@ fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}
                 Text("إضافة صنف")
             }
             OutlinedButton(
+                onClick = { showCategoryOrder = true },
+            ) {
+                Icon(Icons.Outlined.SwapVert, null)
+                Spacer(Modifier.width(4.dp))
+                Text("ترتيب")
+            }
+            OutlinedButton(
                 onClick = { showCompanies = true },
             ) {
                 Icon(Icons.Outlined.Storefront, null)
-                Spacer(Modifier.width(5.dp))
+                Spacer(Modifier.width(4.dp))
                 Text("الشركات")
             }
         }
@@ -177,17 +185,19 @@ fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Column(Modifier.weight(1f)) {
+                                    val marketTitle = item.marketName.ifBlank {
+                                        StarterCatalog.marketName(item.name)
+                                    }
                                     Text(
-                                        item.name,
+                                        marketTitle,
                                         style = MaterialTheme.typography.bodyMedium,
                                         maxLines = 1,
                                     )
-                                    val market = StarterCatalog.marketLabel(item.name)
-                                    val detail = when {
-                                        market.isNotBlank() -> "$market • ${item.defaultUnit}"
-                                        item.specification.isNotBlank() -> "${item.specification} • ${item.defaultUnit}"
-                                        else -> item.defaultUnit
-                                    }
+                                    val detail = buildList {
+                                        if (!marketTitle.equals(item.name, ignoreCase = true)) add(item.name)
+                                        if (item.specification.isNotBlank()) add(item.specification)
+                                        add(item.defaultUnit)
+                                    }.joinToString(" • ")
                                     Text(
                                         detail,
                                         style = MaterialTheme.typography.labelSmall,
