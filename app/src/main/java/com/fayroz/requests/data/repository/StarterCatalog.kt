@@ -102,6 +102,22 @@ object StarterCatalog {
         Regex("""\d+(?:\.\d+)?""").find(name)?.value?.toDoubleOrNull() ?: Double.MAX_VALUE
 
     private fun marketAlias(name: String): String = when {
+        name.startsWith("حديد تسليح") -> "سيخ حديد / حديد مباني"
+        name.startsWith("خرسانة جاهزة") -> "خرسانة ريدي ميكس / Ready Mix"
+        name.startsWith("بلوك AAC") -> "بلوك خفيف / AAC"
+        name.startsWith("لفائف عزل بيتومين") -> "رول عزل بيتومين / ممبرين"
+        name.startsWith("Waterstop") -> "وتر ستوب"
+        name.startsWith("ألواح XPS") -> "فوم أزرق XPS"
+        name.startsWith("ألواح EPS") -> "فوم أبيض EPS"
+        name.startsWith("Cable Tray") -> "تراي كابلات"
+        name.startsWith("Cable Ladder") -> "لادر كابلات"
+        name.startsWith("PVC Trunking") -> "ترنكنج كهرباء"
+        name.startsWith("Manual Call Point") -> "كاسر زجاج إنذار حريق"
+        name.startsWith("Sounder Beacon") -> "ساوندر فلاشر"
+        name.startsWith("Fire Bell") -> "جرس إنذار حريق"
+        name.startsWith("ماسورة HDPE") -> "ماسورة بولي إيثيلين"
+        name.startsWith("UPS") -> "يو بي إس"
+        name.startsWith("مولد ديزل") -> "جينيراتور / مولد"
         name.startsWith("ماسورة PPR") -> "ماسورة حراري"
         name.startsWith("كوع PPR") -> "كوع حراري"
         name.startsWith("تي PPR") -> "تي حراري"
