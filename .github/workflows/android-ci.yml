@@ -18,6 +18,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      RELEASE_KEYSTORE_B64: ${{ secrets.FAYROZ_KEYSTORE_B64 }}
 
     steps:
       - name: Checkout
@@ -72,17 +74,15 @@ jobs:
           retention-days: 30
 
       - name: Decode release keystore
-        if: ${{ secrets.FAYROZ_KEYSTORE_B64 != '' }}
+        if: ${{ env.RELEASE_KEYSTORE_B64 != '' }}
         shell: bash
-        env:
-          FAYROZ_KEYSTORE_B64: ${{ secrets.FAYROZ_KEYSTORE_B64 }}
         run: |
           set -euo pipefail
-          printf '%s' "$FAYROZ_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/fayroz-release.jks"
+          printf '%s' "$RELEASE_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/fayroz-release.jks"
           test -s "$RUNNER_TEMP/fayroz-release.jks"
 
       - name: Build signed release APK
-        if: ${{ secrets.FAYROZ_KEYSTORE_B64 != '' }}
+        if: ${{ env.RELEASE_KEYSTORE_B64 != '' }}
         env:
           FAYROZ_KEYSTORE_PATH: ${{ runner.temp }}/fayroz-release.jks
           FAYROZ_STORE_PASSWORD: ${{ secrets.FAYROZ_STORE_PASSWORD }}
@@ -91,7 +91,7 @@ jobs:
         run: gradle assembleRelease --stacktrace
 
       - name: Upload signed release APK
-        if: ${{ secrets.FAYROZ_KEYSTORE_B64 != '' }}
+        if: ${{ env.RELEASE_KEYSTORE_B64 != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: FayrozRequests-v0.9.3-release
