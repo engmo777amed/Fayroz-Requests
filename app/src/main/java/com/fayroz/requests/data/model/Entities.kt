@@ -30,6 +30,7 @@ data class ProjectEntity(
 data class CategoryEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
+    val sortOrder: Int = 0,
 )
 
 
@@ -64,6 +65,7 @@ data class ItemEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val code: String,
     val name: String,
+    val marketName: String = "",
     val normalizedName: String,
     val categoryId: Long? = null,
     val defaultUnit: String,
