@@ -12,12 +12,14 @@ class FayrozRequestsApp : Application() {
         val prefs = getSharedPreferences("fayroz_requests_setup", MODE_PRIVATE)
         val catalogReady = prefs.getBoolean("starter_catalog_v4_seeded", false)
         val marketCatalogReady = prefs.getBoolean("market_catalog_v6_seeded", false)
+        val marketNamesReady = prefs.getBoolean("market_names_v7_seeded", false)
 
-        if (!catalogReady || !marketCatalogReady || !repository.hasAnyItems()) {
+        if (!catalogReady || !marketCatalogReady || !marketNamesReady || !repository.hasAnyItems()) {
             repository.ensureStarterCatalog()
             prefs.edit()
                 .putBoolean("starter_catalog_v4_seeded", true)
                 .putBoolean("market_catalog_v6_seeded", true)
+                .putBoolean("market_names_v7_seeded", true)
                 .apply()
         }
 
