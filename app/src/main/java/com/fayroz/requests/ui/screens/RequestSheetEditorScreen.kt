@@ -1,6 +1,13 @@
 package com.fayroz.requests.ui.screens
 
+import android.content.Context
+import android.content.Intent
+import android.graphics.Bitmap
+import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.FileProvider
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
@@ -29,8 +36,11 @@ import com.fayroz.requests.data.model.RequestLineDraft
 import com.fayroz.requests.data.model.RequestSheetDraft
 import com.fayroz.requests.data.repository.FayrozRepository
 import com.fayroz.requests.data.repository.StarterCatalog
+import com.fayroz.requests.export.FayrozReports
+import com.fayroz.requests.export.ShareFiles
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.io.File
 
 private data class EditableLineUi(
     val localId: Long,
@@ -58,6 +68,60 @@ fun RequestSheetEditorScreen(
     val allItems by repository.items.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    var attachmentUri by remember { mutableStateOf<String?>(null) }
+
+    val imagePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                )
+            }
+            attachmentUri = uri.toString()
+        }
+    }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicturePreview()
+    ) { bitmap ->
+        if (bitmap != null) {
+            runCatching {
+                val dir = File(context.filesDir, "attachments").apply { mkdirs() }
+                val file = File(dir, "request_${System.currentTimeMillis()}.jpg")
+                file.outputStream().use { output ->
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 90, output)
+                }
+                attachmentUri = file.absolutePath
+            }.onFailure {
+                Toast.makeText(context, "تعذر حفظ الصورة.", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    val pdfLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/pdf")
+    ) { uri ->
+        val id = sheetId
+        if (uri != null && id != null) {
+            scope.launch {
+                runCatching {
+                    val savedSheet = repository.getSheet(id) ?: error("الكشف غير موجود")
+                    val project = repository.getProject(savedSheet.projectId) ?: error("المشروع غير موجود")
+                    val savedLines = repository.getRequestLines(id)
+                    context.contentResolver.openOutputStream(uri)?.use {
+                        FayrozReports.writeRequestSheetPdf(it, project, savedSheet, savedLines)
+                    } ?: error("تعذر فتح الملف")
+                }.onSuccess {
+                    Toast.makeText(context, "تم تصدير PDF ✓", Toast.LENGTH_SHORT).show()
+                }.onFailure {
+                    Toast.makeText(context, "تعذر تصدير PDF", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
 
     val categories = remember(allCategories) {
         allCategories.filterNot { it.name in StarterCatalog.hiddenCategories }
@@ -95,6 +159,7 @@ fun RequestSheetEditorScreen(
                 trade = draft.trade
                 craftsmanName = draft.craftsmanName
                 workLocation = draft.workLocation
+                attachmentUri = draft.attachmentUri
                 notes = draft.notes
                 sheetDate = draft.sheetDate
                 lines.clear()
@@ -211,6 +276,7 @@ fun RequestSheetEditorScreen(
                                         trade = trade,
                                         craftsmanName = craftsmanName.trim(),
                                         workLocation = workLocation.trim(),
+                                        attachmentUri = attachmentUri,
                                         notes = notes,
                                         lines = lines.map { line ->
                                             RequestLineDraft(
@@ -293,6 +359,119 @@ fun RequestSheetEditorScreen(
                                 label = { Text("المكان (اختياري)") },
                                 placeholder = { Text("حمام / مطبخ") },
                                 singleLine = true,
+                            )
+                        }
+                    }
+                }
+            }
+
+            item {
+                Card {
+                    Column(
+                        Modifier.fillMaxWidth().padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(7.dp),
+                    ) {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(Icons.Outlined.AttachFile, null)
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                if (attachmentUri == null) "صورة الكشف الأصلي"
+                                else "تم إرفاق صورة بالكشف ✓",
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.titleSmall,
+                            )
+                            if (attachmentUri != null) {
+                                IconButton(
+                                    onClick = {
+                                        attachmentUri?.let { openRequestAttachment(context, it) }
+                                    },
+                                    modifier = Modifier.size(34.dp),
+                                ) {
+                                    Icon(Icons.Outlined.Visibility, "فتح المرفق")
+                                }
+                                IconButton(
+                                    onClick = { attachmentUri = null },
+                                    modifier = Modifier.size(34.dp),
+                                ) {
+                                    Icon(Icons.Outlined.Close, "حذف المرفق")
+                                }
+                            }
+                        }
+
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(7.dp),
+                        ) {
+                            OutlinedButton(
+                                onClick = { imagePicker.launch(arrayOf("image/*")) },
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Icon(Icons.Outlined.Image, null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(5.dp))
+                                Text("إرفاق صورة")
+                            }
+                            OutlinedButton(
+                                onClick = { cameraLauncher.launch(null) },
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Icon(Icons.Outlined.PhotoCamera, null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(5.dp))
+                                Text("تصوير")
+                            }
+                        }
+
+                        if (sheetId != null) {
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(7.dp),
+                            ) {
+                                OutlinedButton(
+                                    onClick = {
+                                        pdfLauncher.launch("FAYROZ-Request-${sheetNumber.ifBlank { sheetId.toString() }}.pdf")
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                ) {
+                                    Icon(Icons.Outlined.PictureAsPdf, null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(5.dp))
+                                    Text("PDF")
+                                }
+                                Button(
+                                    onClick = {
+                                        scope.launch {
+                                            runCatching {
+                                                val savedSheet = repository.getSheet(sheetId) ?: error("الكشف غير موجود")
+                                                val project = repository.getProject(savedSheet.projectId) ?: error("المشروع غير موجود")
+                                                val savedLines = repository.getRequestLines(sheetId)
+                                                ShareFiles.sharePdf(
+                                                    context,
+                                                    "FAYROZ-Request-${savedSheet.sheetNumber}.pdf",
+                                                ) {
+                                                    FayrozReports.writeRequestSheetPdf(
+                                                        it,
+                                                        project,
+                                                        savedSheet,
+                                                        savedLines,
+                                                    )
+                                                }
+                                            }.onFailure {
+                                                Toast.makeText(context, "تعذر مشاركة الكشف.", Toast.LENGTH_LONG).show()
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                ) {
+                                    Icon(Icons.Outlined.Share, null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(5.dp))
+                                    Text("مشاركة")
+                                }
+                            }
+                            Text(
+                                "التصدير والمشاركة يستخدمان آخر نسخة محفوظة من الكشف.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
@@ -765,5 +944,27 @@ private fun friendlySheetSaveError(error: Throwable): String {
 
         else ->
             "تعذر حفظ الكشف. راجع البيانات وحاول مرة أخرى."
+    }
+}
+
+
+private fun openRequestAttachment(context: Context, reference: String) {
+    runCatching {
+        val uri = if (reference.startsWith("content://")) {
+            Uri.parse(reference)
+        } else {
+            FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                File(reference),
+            )
+        }
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "image/*")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(intent)
+    }.onFailure {
+        Toast.makeText(context, "تعذر فتح المرفق.", Toast.LENGTH_SHORT).show()
     }
 }
