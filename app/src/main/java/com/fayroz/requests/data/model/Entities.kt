@@ -141,7 +141,7 @@ data class RequestLineEntity(
 
 @Entity(
     tableName = "pricing_copies",
-    indices = [Index("sheetId")],
+    indices = [Index("sheetId"), Index("supplierId")],
     foreignKeys = [ForeignKey(
         entity = RequestSheetEntity::class,
         parentColumns = ["id"],
@@ -153,6 +153,8 @@ data class PricingCopyEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val sheetId: Long,
     val placeName: String,
+    val supplierId: Long? = null,
+    val quoteNumber: String = "",
     val quoteDate: Long = System.currentTimeMillis(),
     val notes: String = "",
     val createdAt: Long = System.currentTimeMillis(),
@@ -279,6 +281,7 @@ data class SupplierPriceEntity(
     val netPrice: Double,
     val priceDate: Long,
     val source: PriceSource,
+    val sourceReference: String = "",
     val notes: String = "",
     val createdAt: Long = System.currentTimeMillis(),
 )
