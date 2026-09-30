@@ -227,7 +227,27 @@ object MarketCatalogExpansion {
             )
         }
 
-        listOf("1.5","2","2.5","4","6","10","16","25","35").forEach { section ->
+        listOf("0.5","0.75","1").forEach { section ->
+            put(
+                category = "كهرباء - تأسيس",
+                name = "H05V-R 300/500V 1×$section مم²",
+                unit = "لفة",
+                specification = "نحاس مجدول Class 2 • PVC • دوائر وتحكم خفيفة",
+                marketName = "سلك نحاس مجدول خفيف $section مم²",
+            )
+        }
+
+        listOf("0.5","0.75","1").forEach { section ->
+            put(
+                category = "كهرباء - تأسيس",
+                name = "H05V-K 300/500V 1×$section مم²",
+                unit = "لفة",
+                specification = "نحاس مرن Class 5 • PVC • لوحات وأجهزة وتحكم",
+                marketName = "سلك نحاس شعر خفيف $section مم²",
+            )
+        }
+
+        listOf("1.5","2","2.5","3","4","6","10","16","25","35","50","70","95","120","150","185","240","300","400","500","630").forEach { section ->
             put(
                 category = "كهرباء - تأسيس",
                 name = "H07V-R 450/750V 1×$section مم²",
@@ -237,7 +257,7 @@ object MarketCatalogExpansion {
             )
         }
 
-        listOf("1.5","2.5","4","6","10","16","25","35","50","70","95","120","150","185","240").forEach { section ->
+        listOf("1.5","2","2.5","3","4","6","10","16","25","35","50","70","95","120","150","185","240","300").forEach { section ->
             put(
                 category = "كهرباء - تأسيس",
                 name = "H07V-K 450/750V 1×$section مم²",
@@ -248,7 +268,7 @@ object MarketCatalogExpansion {
         }
 
         // سلك أرضي أخضر/أصفر بنفس مقاطع سلك المباني الشائعة
-        listOf("1.5","2.5","4","6","10","16","25","35","50","70","95","120","150","185","240").forEach { section ->
+        listOf("1.5","2","2.5","3","4","6","10","16","25","35","50","70","95","120","150","185","240","300").forEach { section ->
             put(
                 category = "كهرباء - تأسيس",
                 name = "PE H07V-K 450/750V 1×$section مم² أخضر/أصفر",
