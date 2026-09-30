@@ -132,6 +132,7 @@ data class RequestLineEntity(
     val itemId: Long,
     val quantity: Double,
     val unit: String,
+    val sortOrder: Int = 0,
     val brand: String = "",
     val usage: String = "",
     val lineDescription: String = "",
