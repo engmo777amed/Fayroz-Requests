@@ -73,6 +73,17 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      - name: Build unsigned release APK
+        run: gradle assembleRelease --stacktrace
+
+      - name: Upload unsigned release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: FayrozRequests-v0.9.3-release-unsigned
+          path: app/build/outputs/apk/release/app-release-unsigned.apk
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Decode release keystore
         if: ${{ env.RELEASE_KEYSTORE_B64 != '' }}
         shell: bash
