@@ -13,6 +13,9 @@ object MarketCatalogExpansion {
         "صرف خارجي وشبكات",
         "مكافحة حريق",
         "أرضيات خشبية وبدائل",
+        "شبكات مياه وري",
+        "إنذار حريق",
+        "مولدات وUPS",
     )
 
     val items: List<StarterItem> = buildList {
@@ -244,5 +247,64 @@ object MarketCatalogExpansion {
                 if (name.contains("مادة") || name.startsWith("إيبوكسي")) "جركن" else "شيكارة",
             )
         }
+
+        // مسارات كهرباء ولوحات فرعية
+        listOf(50,75,100,150,200,300,400,600).forEach { width ->
+            put("كهرباء - تأسيس", "Cable Tray مجلفن عرض $width مم", "م")
+            put("كهرباء - تأسيس", "Cable Ladder مجلفن عرض $width مم", "م")
+        }
+        listOf(25,40,60,80,100,150).forEach { size ->
+            put("كهرباء - تأسيس", "PVC Trunking مقاس $size مم", "م")
+        }
+        listOf(
+            "غطاء Cable Tray","وصلة Cable Tray","كوع أفقي Cable Tray","كوع رأسي Cable Tray",
+            "Tee Cable Tray","Cross Cable Tray","حامل Tray جداري","حامل Tray سقفي","Threaded Rod M10 للمسارات",
+            "Busbar نحاس 100A","Busbar نحاس 160A","Busbar نحاس 250A",
+        ).forEach { put("كهرباء - تأسيس", it, if (it.contains("Busbar")) "عدد" else "عدد") }
+
+        // إنذار حريق
+        listOf(
+            "لوحة إنذار حريق Conventional 2 Zone","لوحة إنذار حريق Conventional 4 Zone",
+            "لوحة إنذار حريق Conventional 8 Zone","لوحة إنذار حريق Addressable 1 Loop",
+            "لوحة إنذار حريق Addressable 2 Loop","كاشف دخان Conventional","كاشف حرارة Conventional",
+            "كاشف دخان Addressable","كاشف حرارة Addressable","كاشف Multi Sensor",
+            "Manual Call Point","Sounder Beacon","Fire Bell","Input Module","Output Module",
+            "Monitor Module","Control Module","Short Circuit Isolator","Repeater Panel",
+            "Beam Detector","Duct Smoke Detector","قاعدة كاشف حريق","بطارية 12V 7Ah",
+            "كابل إنذار حريق مقاوم للحريق 2×1.5 مم²","كابل إنذار حريق مقاوم للحريق 2×2.5 مم²",
+        ).forEach { name ->
+            put("إنذار حريق", name, if (name.startsWith("كابل")) "م" else "عدد")
+        }
+
+        // شبكات مياه وري وHDPE
+        listOf(20,25,32,40,50,63,75,90,110,160,200,250,315).forEach { s ->
+            put("شبكات مياه وري", "ماسورة HDPE PE100 $s مم", "م")
+        }
+        listOf(25,32,40,50,63,75,90,110).forEach { s ->
+            put("شبكات مياه وري", "كوع Compression HDPE $s مم", "عدد")
+            put("شبكات مياه وري", "تي Compression HDPE $s مم", "عدد")
+            put("شبكات مياه وري", "وصلة Compression HDPE $s مم", "عدد")
+            put("شبكات مياه وري", "محبس كورة HDPE $s مم", "عدد")
+        }
+        listOf(
+            "محبس بوابة Ductile Iron DN50","محبس بوابة Ductile Iron DN80","محبس بوابة Ductile Iron DN100",
+            "محبس فراشة DN100","محبس فراشة DN150","محبس عدم رجوع DN100","Air Valve DN50",
+            "عداد مياه 1 بوصة","عداد مياه 2 بوصة","عداد مياه DN50","عداد مياه DN100",
+            "رشاش ري Pop-up 10 سم","رشاش ري Rotor","Solenoid Valve 1 بوصة","Solenoid Valve 2 بوصة",
+            "Controller ري 4 Zone","Controller ري 8 Zone","فلتر شبكي ري 1 بوصة","فلتر شبكي ري 2 بوصة",
+            "نقاطة 4 لتر/ساعة","خرطوم تنقيط 16 مم",
+        ).forEach { name ->
+            put("شبكات مياه وري", name, if (name.startsWith("خرطوم") || name.startsWith("نقاطة")) "م" else "عدد")
+        }
+
+        // مولدات وUPS
+        listOf(
+            "UPS Online 1 kVA","UPS Online 2 kVA","UPS Online 3 kVA","UPS Online 6 kVA","UPS Online 10 kVA",
+            "بطارية UPS 12V 7Ah","بطارية UPS 12V 9Ah","بطارية UPS 12V 18Ah","بطارية UPS 12V 26Ah",
+            "مولد ديزل 30 kVA","مولد ديزل 50 kVA","مولد ديزل 100 kVA","مولد ديزل 150 kVA",
+            "مولد ديزل 250 kVA","مولد ديزل 500 kVA","ATS مولد 100A","ATS مولد 250A","ATS مولد 400A",
+            "شاحن بطارية مولد","سخان مياه جاكيت مولد","كابل بطارية مولد","خزان سولار يومي",
+        ).forEach { put("مولدات وUPS", it, "عدد") }
+
     }
 }
