@@ -216,21 +216,34 @@ class FayrozRepository(private val database: FayrozDatabase) {
     suspend fun getPriceList(priceListId: Long): PriceListEntity? = dao.getPriceList(priceListId)
     suspend fun getSheet(sheetId: Long): RequestSheetEntity? = dao.getSheet(sheetId)
     suspend fun getProject(projectId: Long): ProjectEntity? = dao.getProject(projectId)
+    suspend fun getRequestLines(sheetId: Long): List<RequestLineDetail> = dao.getRequestLineDetails(sheetId)
 
     fun pricingCopies(sheetId: Long): Flow<List<PricingCopySummary>> = dao.observePricingCopies(sheetId)
 
     suspend fun createPricingCopy(
         sheetId: Long,
         placeName: String,
+        supplierId: Long? = null,
+        createSupplier: Boolean = false,
+        quoteNumber: String = "",
+        quoteDate: Long = System.currentTimeMillis(),
         notes: String = "",
     ): Long = database.withTransaction {
         val cleanPlace = placeName.trim()
         require(cleanPlace.isNotBlank()) { "اسم المكان أو المورد مطلوب" }
         val sheet = dao.getSheet(sheetId) ?: error("الكشف غير موجود")
+        val finalSupplierId = when {
+            supplierId != null -> supplierId
+            createSupplier -> dao.insertSupplier(SupplierEntity(name = cleanPlace))
+            else -> null
+        }
         val copyId = dao.insertPricingCopy(
             PricingCopyEntity(
                 sheetId = sheet.id,
                 placeName = cleanPlace,
+                supplierId = finalSupplierId,
+                quoteNumber = quoteNumber.trim(),
+                quoteDate = quoteDate,
                 notes = notes.trim(),
             )
         )
@@ -246,7 +259,42 @@ class FayrozRepository(private val database: FayrozDatabase) {
         copyId
     }
 
-    suspend fun deletePricingCopy(copyId: Long) {
+    suspend fun updatePricingCopyMetadata(
+        copyId: Long,
+        placeName: String,
+        supplierId: Long?,
+        createSupplier: Boolean = false,
+        quoteNumber: String = "",
+        quoteDate: Long,
+        notes: String = "",
+    ) = database.withTransaction {
+        val current = dao.getPricingCopy(copyId) ?: error("نسخة التسعير غير موجودة")
+        val cleanPlace = placeName.trim()
+        require(cleanPlace.isNotBlank()) { "اسم المكان أو المورد مطلوب" }
+        val finalSupplierId = when {
+            supplierId != null -> supplierId
+            createSupplier -> dao.insertSupplier(SupplierEntity(name = cleanPlace))
+            else -> null
+        }
+        val updated = current.copy(
+            placeName = cleanPlace,
+            supplierId = finalSupplierId,
+            quoteNumber = quoteNumber.trim(),
+            quoteDate = quoteDate,
+            notes = notes.trim(),
+        )
+        dao.updatePricingCopy(updated)
+        if (finalSupplierId == null) {
+            dao.deletePricesBySourceReferencePrefix("pricing-copy:$copyId:")
+        } else {
+            dao.getPricingCopyLineDetails(copyId).forEach { line ->
+                syncPricingCopyLineToHistory(updated, line.requestLineId, line.unitPrice)
+            }
+        }
+    }
+
+    suspend fun deletePricingCopy(copyId: Long) = database.withTransaction {
+        dao.deletePricesBySourceReferencePrefix("pricing-copy:$copyId:")
         dao.getPricingCopy(copyId)?.let { dao.deletePricingCopy(it) }
     }
 
@@ -302,6 +350,58 @@ class FayrozRepository(private val database: FayrozDatabase) {
                 current.copy(
                     brand = brand.trim(),
                     unitPrice = safePrice,
+                )
+            )
+        }
+        dao.getPricingCopy(copyId)?.let { copy ->
+            syncPricingCopyLineToHistory(copy, requestLineId, safePrice)
+        }
+    }
+
+    private suspend fun syncPricingCopyLineToHistory(
+        copy: PricingCopyEntity,
+        requestLineId: Long,
+        unitPrice: Double?,
+    ) {
+        val sourceReference = "pricing-copy:${copy.id}:$requestLineId"
+        val existing = dao.getPriceBySourceReference(sourceReference)
+        val supplierId = copy.supplierId
+        val requestLine = dao.getRequestLine(requestLineId)
+        if (supplierId == null || requestLine == null || unitPrice == null) {
+            existing?.let { dao.deletePrice(it) }
+            return
+        }
+
+        val note = buildString {
+            append("عرض سعر: ${copy.placeName}")
+            if (copy.quoteNumber.isNotBlank()) append(" • رقم ${copy.quoteNumber}")
+        }
+        val value = unitPrice.coerceAtLeast(0.0)
+        if (existing == null) {
+            dao.insertPrice(
+                SupplierPriceEntity(
+                    supplierId = supplierId,
+                    itemId = requestLine.itemId,
+                    listPrice = value,
+                    appliedDiscountPercent = 0.0,
+                    netPrice = value,
+                    priceDate = copy.quoteDate,
+                    source = PriceSource.DIRECT_QUOTE,
+                    sourceReference = sourceReference,
+                    notes = note,
+                )
+            )
+        } else {
+            dao.updatePrice(
+                existing.copy(
+                    supplierId = supplierId,
+                    itemId = requestLine.itemId,
+                    listPrice = value,
+                    appliedDiscountPercent = 0.0,
+                    netPrice = value,
+                    priceDate = copy.quoteDate,
+                    source = PriceSource.DIRECT_QUOTE,
+                    notes = note,
                 )
             )
         }
@@ -736,6 +836,41 @@ class FayrozRepository(private val database: FayrozDatabase) {
 
     suspend fun deleteSheet(sheetId: Long) {
         dao.getSheet(sheetId)?.let { dao.deleteSheet(it) }
+    }
+
+    suspend fun duplicateSheet(sheetId: Long): Long = database.withTransaction {
+        val source = dao.getSheet(sheetId) ?: error("الكشف غير موجود")
+        val lines = dao.getRequestLineDetails(sheetId)
+        val newNumber = (dao.maxNumericSheetNumber(source.projectId) + 1).toString().padStart(3, '0')
+        val newId = dao.insertSheet(
+            source.copy(
+                id = 0,
+                sheetNumber = newNumber,
+                sheetDate = System.currentTimeMillis(),
+                attachmentUri = null,
+                createdAt = System.currentTimeMillis(),
+            )
+        )
+        dao.insertRequestLines(
+            lines.map { line ->
+                RequestLineEntity(
+                    sheetId = newId,
+                    itemId = line.itemId,
+                    quantity = line.quantity,
+                    unit = line.unit,
+                    brand = "",
+                    usage = "",
+                    lineDescription = line.lineDescription,
+                    notes = line.notes,
+                )
+            }
+        )
+        newId
+    }
+
+    suspend fun updateSheetAttachment(sheetId: Long, attachmentUri: String?) {
+        val sheet = dao.getSheet(sheetId) ?: return
+        dao.updateSheet(sheet.copy(attachmentUri = attachmentUri))
     }
 
     private suspend fun resolveItemId(line: RequestLineDraft): Long {
