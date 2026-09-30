@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import com.fayroz.requests.data.model.CategoryEntity
 import com.fayroz.requests.data.model.ItemEntity
 import com.fayroz.requests.data.repository.FayrozRepository
+import com.fayroz.requests.data.repository.StarterCatalog
 import kotlinx.coroutines.launch
 
 @Composable
@@ -30,11 +31,23 @@ fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}
     var selectedCategoryId by remember { mutableStateOf<Long?>(null) }
 
     val visibleCategories = remember(categories) {
-        categories.filterNot { it.name in com.fayroz.requests.data.repository.StarterCatalog.hiddenCategories }
+        categories
+            .filterNot { it.name in StarterCatalog.hiddenCategories }
+            .sortedWith(compareBy<CategoryEntity> { StarterCatalog.categoryRank(it.name) }.thenBy { it.name })
     }
     val visibleCategoryIds = remember(visibleCategories) { visibleCategories.map { it.id }.toSet() }
-    val visibleItems = remember(allItems, visibleCategoryIds) {
-        allItems.filter { it.categoryId == null || it.categoryId in visibleCategoryIds }
+    val categoryRankById = remember(visibleCategories) {
+        visibleCategories.associate { it.id to StarterCatalog.categoryRank(it.name) }
+    }
+    val visibleItems = remember(allItems, visibleCategoryIds, categoryRankById) {
+        allItems
+            .filter { it.categoryId == null || it.categoryId in visibleCategoryIds }
+            .sortedWith(
+                compareBy<ItemEntity> { categoryRankById[it.categoryId] ?: Int.MAX_VALUE }
+                    .thenBy { StarterCatalog.itemFamilyRank(it.name) }
+                    .thenBy { StarterCatalog.firstMarketNumber(it.name) }
+                    .thenBy { it.name }
+            )
     }
     val categoryById = remember(visibleCategories) { visibleCategories.associateBy { it.id } }
     val filtered = remember(visibleItems, query, categoryById, selectedCategoryId) {
@@ -45,6 +58,7 @@ fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}
                 item.name.contains(query, true) ||
                 item.code.contains(query, true) ||
                 item.specification.contains(query, true) ||
+                StarterCatalog.marketLabel(item.name).contains(query, true) ||
                 categoryName.contains(query, true)
             categoryMatches && queryMatches
         }
@@ -107,56 +121,88 @@ fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}
                 },
             )
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(filtered, key = { it.id }) { item ->
-                    Card {
+            val grouped = filtered.groupBy { it.categoryId }
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                grouped.forEach { (categoryId, groupItems) ->
+                    item(key = "cat_${categoryId ?: 0}") {
                         Row(
-                            Modifier.fillMaxWidth().padding(13.dp),
+                            Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Column(
-                                Modifier.weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(3.dp),
+                            Text(
+                                categoryId?.let { categoryById[it]?.name } ?: "أخرى",
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            Text(
+                                "${groupItems.size} صنف",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    items(groupItems, key = { it.id }) { item ->
+                        Surface(
+                            shape = MaterialTheme.shapes.small,
+                            color = MaterialTheme.colorScheme.surface,
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                MaterialTheme.colorScheme.outlineVariant,
+                            ),
+                        ) {
+                            Row(
+                                Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text(item.name, style = MaterialTheme.typography.titleMedium)
-                                val categoryName = item.categoryId?.let { categoryById[it]?.name }
-                                if (!categoryName.isNullOrBlank()) {
+                                Column(Modifier.weight(1f)) {
                                     Text(
-                                        categoryName,
+                                        item.name,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        maxLines = 1,
+                                    )
+                                    val market = StarterCatalog.marketLabel(item.name)
+                                    val detail = when {
+                                        market.isNotBlank() -> "$market • ${item.defaultUnit}"
+                                        item.specification.isNotBlank() -> "${item.specification} • ${item.defaultUnit}"
+                                        else -> item.defaultUnit
+                                    }
+                                    Text(
+                                        detail,
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.secondary,
-                                    )
-                                }
-                                if (item.specification.isNotBlank()) {
-                                    Text(
-                                        item.specification,
-                                        style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
                                     )
                                 }
-                                Text(
-                                    "الوحدة: ${item.defaultUnit}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
 
-                            IconButton(onClick = { editingItem = item }) {
-                                Icon(Icons.Outlined.Edit, "تعديل الصنف")
-                            }
-                            IconButton(onClick = { onOpenHistory(item.id) }) {
-                                Icon(
-                                    Icons.Outlined.History,
-                                    "تاريخ السعر",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
-                            }
-                            IconButton(onClick = { deletingItem = item }) {
-                                Icon(
-                                    Icons.Outlined.DeleteOutline,
-                                    "حذف الصنف",
-                                    tint = MaterialTheme.colorScheme.error,
-                                )
+                                IconButton(
+                                    onClick = { editingItem = item },
+                                    modifier = Modifier.size(32.dp),
+                                ) {
+                                    Icon(Icons.Outlined.Edit, "تعديل الصنف", modifier = Modifier.size(18.dp))
+                                }
+                                IconButton(
+                                    onClick = { onOpenHistory(item.id) },
+                                    modifier = Modifier.size(32.dp),
+                                ) {
+                                    Icon(
+                                        Icons.Outlined.History,
+                                        "تاريخ السعر",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { deletingItem = item },
+                                    modifier = Modifier.size(32.dp),
+                                ) {
+                                    Icon(
+                                        Icons.Outlined.DeleteOutline,
+                                        "حذف الصنف",
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                }
                             }
                         }
                     }
