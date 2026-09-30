@@ -21,9 +21,11 @@ import kotlinx.coroutines.launch
 fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}) {
     val allItems by repository.items.collectAsState(initial = emptyList())
     val categories by repository.categories.collectAsState(initial = emptyList())
+    val categoryBrands by repository.categoryBrands.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
 
     var showAdd by remember { mutableStateOf(false) }
+    var showCompanies by remember { mutableStateOf(false) }
     var editingItem by remember { mutableStateOf<ItemEntity?>(null) }
     var deletingItem by remember { mutableStateOf<ItemEntity?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
@@ -73,7 +75,26 @@ fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}
             "الأصناف مرتبة حسب القسم ويمكن إضافتها أو تعديلها أو حذف غير المستخدم منها",
         )
 
-        PrimaryAction("إضافة صنف", Icons.Outlined.AddBox) { showAdd = true }
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Button(
+                onClick = { showAdd = true },
+                modifier = Modifier.weight(1f),
+            ) {
+                Icon(Icons.Outlined.AddBox, null)
+                Spacer(Modifier.width(6.dp))
+                Text("إضافة صنف")
+            }
+            OutlinedButton(
+                onClick = { showCompanies = true },
+            ) {
+                Icon(Icons.Outlined.Storefront, null)
+                Spacer(Modifier.width(5.dp))
+                Text("الشركات")
+            }
+        }
 
         OutlinedTextField(
             value = query,
@@ -211,6 +232,14 @@ fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}
         }
     }
 
+    if (showCompanies) {
+        CatalogCompaniesDialog(
+            categories = visibleCategories,
+            brands = categoryBrands,
+            onDismiss = { showCompanies = false },
+        )
+    }
+
     if (showAdd) {
         ItemEditorDialog(
             title = "إضافة صنف",
@@ -306,6 +335,73 @@ fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}
             },
         )
     }
+}
+
+@Composable
+private fun CatalogCompaniesDialog(
+    categories: List<CategoryEntity>,
+    brands: List<com.fayroz.requests.data.model.CategoryBrandEntity>,
+    onDismiss: () -> Unit,
+) {
+    var selectedCategoryId by remember { mutableStateOf<Long?>(null) }
+    val filteredCategories = remember(categories, selectedCategoryId) {
+        if (selectedCategoryId == null) categories
+        else categories.filter { it.id == selectedCategoryId }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("الشركات والماركات") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    item {
+                        FilterChip(
+                            selected = selectedCategoryId == null,
+                            onClick = { selectedCategoryId = null },
+                            label = { Text("الكل") },
+                        )
+                    }
+                    items(categories, key = { it.id }) { category ->
+                        FilterChip(
+                            selected = selectedCategoryId == category.id,
+                            onClick = { selectedCategoryId = category.id },
+                            label = { Text(category.name) },
+                        )
+                    }
+                }
+
+                LazyColumn(
+                    modifier = Modifier.heightIn(max = 480.dp),
+                    verticalArrangement = Arrangement.spacedBy(7.dp),
+                ) {
+                    items(filteredCategories, key = { it.id }) { category ->
+                        val names = brands
+                            .filter { it.categoryId == category.id }
+                            .map { it.name }
+                            .distinct()
+                        if (names.isNotEmpty()) {
+                            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text(
+                                    category.name,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                                Text(
+                                    names.joinToString(" • "),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("إغلاق") }
+        },
+    )
 }
 
 @Composable
