@@ -796,12 +796,13 @@ class FayrozRepository(private val database: FayrozDatabase) {
                 )
             )
 
-            val newLines = draft.lines.map { draftLine ->
+            val newLines = draft.lines.mapIndexed { index, draftLine ->
                 RequestLineEntity(
                     sheetId = newId,
                     itemId = resolveItemId(draftLine),
                     quantity = draftLine.quantity,
                     unit = draftLine.unit.trim(),
+                    sortOrder = index,
                     brand = draftLine.brand.trim(),
                     usage = "",
                     lineDescription = draftLine.lineDescription.trim(),
@@ -837,7 +838,7 @@ class FayrozRepository(private val database: FayrozDatabase) {
             val retainedIds = mutableSetOf<Long>()
             val newLineIds = mutableListOf<Long>()
 
-            draft.lines.forEach { draftLine ->
+            draft.lines.forEachIndexed { index, draftLine ->
                 val itemId = resolveItemId(draftLine)
                 val existingLineId = draftLine.existingLineId?.takeIf { it in oldIds }
                 val entity = RequestLineEntity(
@@ -846,6 +847,7 @@ class FayrozRepository(private val database: FayrozDatabase) {
                     itemId = itemId,
                     quantity = draftLine.quantity,
                     unit = draftLine.unit.trim(),
+                    sortOrder = index,
                     brand = draftLine.brand.trim(),
                     usage = "",
                     lineDescription = draftLine.lineDescription.trim(),
@@ -915,12 +917,13 @@ class FayrozRepository(private val database: FayrozDatabase) {
             )
         )
         dao.insertRequestLines(
-            lines.map { line ->
+            lines.mapIndexed { index, line ->
                 RequestLineEntity(
                     sheetId = newId,
                     itemId = line.itemId,
                     quantity = line.quantity,
                     unit = line.unit,
+                    sortOrder = index,
                     brand = "",
                     usage = "",
                     lineDescription = line.lineDescription,
