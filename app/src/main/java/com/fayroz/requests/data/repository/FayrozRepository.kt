@@ -448,8 +448,31 @@ class FayrozRepository(private val database: FayrozDatabase) {
     suspend fun loadPricingCopiesComparison(sheetId: Long): PricingCopiesComparison? {
         val sheet = dao.getSheet(sheetId) ?: return null
         val project = dao.getProject(sheet.projectId) ?: return null
-        val summaries = dao.observePricingCopies(sheetId).first()
-        val copies = summaries.mapNotNull { loadPricingCopyDetail(it.copyId) }
+
+        val copies = dao.getPricingCopies(sheetId).map { copy ->
+            val rawLines = runCatching {
+                dao.getPricingCopyLineDetails(copy.id)
+            }.getOrElse {
+                dao.getPricingCopyLineDetailsCompatibility(copy.id)
+            }
+
+            val safeLines = rawLines
+                .distinctBy { it.requestLineId }
+                .map { line ->
+                    line.copy(
+                        quantity = line.quantity.takeIf { it.isFinite() && it >= 0.0 } ?: 0.0,
+                        unitPrice = line.unitPrice?.takeIf { it.isFinite() && it >= 0.0 },
+                    )
+                }
+
+            PricingCopyDetail(
+                copy = copy,
+                sheet = sheet,
+                project = project,
+                lines = safeLines,
+            )
+        }
+
         return PricingCopiesComparison(sheet, project, copies)
     }
 
