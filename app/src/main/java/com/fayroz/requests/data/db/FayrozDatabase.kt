@@ -24,7 +24,7 @@ import com.fayroz.requests.data.model.*
         SupplierDiscountRuleEntity::class,
         SupplierPriceEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
@@ -121,12 +121,21 @@ abstract class FayrozDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE pricing_copies ADD COLUMN supplierId INTEGER")
+                db.execSQL("ALTER TABLE pricing_copies ADD COLUMN quoteNumber TEXT NOT NULL DEFAULT ''")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_pricing_copies_supplierId ON pricing_copies(supplierId)")
+                db.execSQL("ALTER TABLE supplier_prices ADD COLUMN sourceReference TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         fun create(context: Context): FayrozDatabase = Room.databaseBuilder(
             context.applicationContext,
             FayrozDatabase::class.java,
             "fayroz_requests.db",
         )
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
             .build()
     }
 }
