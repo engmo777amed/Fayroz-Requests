@@ -22,30 +22,31 @@ interface FayrozDao {
     @Update suspend fun updateProject(project: ProjectEntity)
     @Delete suspend fun deleteProject(project: ProjectEntity)
 
-    @Query("SELECT * FROM categories ORDER BY name COLLATE NOCASE")
+    @Query("SELECT * FROM categories ORDER BY sortOrder, name COLLATE NOCASE")
     fun observeCategories(): Flow<List<CategoryEntity>>
 
-    @Query("SELECT * FROM categories ORDER BY name COLLATE NOCASE")
+    @Query("SELECT * FROM categories ORDER BY sortOrder, name COLLATE NOCASE")
     suspend fun getCategories(): List<CategoryEntity>
 
     @Query("SELECT * FROM categories WHERE name = :name COLLATE NOCASE LIMIT 1")
     suspend fun findCategoryByName(name: String): CategoryEntity?
 
     @Insert suspend fun insertCategory(category: CategoryEntity): Long
+    @Update suspend fun updateCategory(category: CategoryEntity)
 
     @Query("UPDATE items SET categoryId = :categoryId WHERE categoryId IS NULL")
     suspend fun assignUncategorizedItems(categoryId: Long)
 
-    @Query("SELECT * FROM items ORDER BY name COLLATE NOCASE")
+    @Query("SELECT * FROM items ORDER BY marketName COLLATE NOCASE, name COLLATE NOCASE")
     fun observeItems(): Flow<List<ItemEntity>>
 
-    @Query("SELECT * FROM items ORDER BY name COLLATE NOCASE")
+    @Query("SELECT * FROM items ORDER BY marketName COLLATE NOCASE, name COLLATE NOCASE")
     suspend fun getItems(): List<ItemEntity>
 
     @Query("SELECT COUNT(*) FROM items")
     suspend fun countItems(): Int
 
-    @Query("SELECT * FROM items WHERE normalizedName LIKE '%' || :query || '%' OR code LIKE '%' || :query || '%' ORDER BY name LIMIT 50")
+    @Query("SELECT * FROM items WHERE normalizedName LIKE '%' || :query || '%' OR marketName LIKE '%' || :query || '%' OR code LIKE '%' || :query || '%' ORDER BY marketName COLLATE NOCASE, name COLLATE NOCASE LIMIT 50")
     fun searchItems(query: String): Flow<List<ItemEntity>>
 
     @Query("SELECT * FROM items WHERE id = :itemId LIMIT 1")
@@ -128,7 +129,7 @@ interface FayrozDao {
         """
         SELECT rl.id AS lineId,
                rl.itemId AS itemId,
-               i.name AS itemName,
+               COALESCE(NULLIF(i.marketName, ''), i.name) AS itemName,
                i.code AS itemCode,
                rl.quantity AS quantity,
                rl.unit AS unit,
@@ -220,7 +221,7 @@ interface FayrozDao {
                sp.priceListId AS priceListId,
                sp.supplierId AS supplierId,
                sp.itemId AS itemId,
-               i.name AS itemName,
+               COALESCE(NULLIF(i.marketName, ''), i.name) AS itemName,
                i.code AS itemCode,
                i.defaultUnit AS unit,
                sp.listPrice AS listPrice,
@@ -347,7 +348,7 @@ interface FayrozDao {
                pcl.copyId AS copyId,
                pcl.requestLineId AS requestLineId,
                rl.itemId AS itemId,
-               i.name AS itemName,
+               COALESCE(NULLIF(i.marketName, ''), i.name) AS itemName,
                i.categoryId AS categoryId,
                rl.quantity AS quantity,
                rl.unit AS unit,
