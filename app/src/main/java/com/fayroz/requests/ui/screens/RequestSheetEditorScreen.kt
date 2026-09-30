@@ -44,6 +44,7 @@ import java.io.File
 
 private data class EditableLineUi(
     val localId: Long,
+    val requestLineId: Long? = null,
     val categoryId: Long? = null,
     val existingItemId: Long? = null,
     val itemName: String = "",
@@ -167,6 +168,7 @@ fun RequestSheetEditorScreen(
                     lines.add(
                         EditableLineUi(
                             localId = index.toLong() + 1,
+                            requestLineId = line.existingLineId,
                             categoryId = allItems.firstOrNull { it.id == line.existingItemId }?.categoryId,
                             existingItemId = line.existingItemId,
                             itemName = line.itemName,
@@ -280,6 +282,7 @@ fun RequestSheetEditorScreen(
                                         notes = notes,
                                         lines = lines.map { line ->
                                             RequestLineDraft(
+                                                existingLineId = line.requestLineId,
                                                 existingItemId = line.existingItemId,
                                                 itemName = line.itemName,
                                                 quantity = line.quantity.toDouble(),
