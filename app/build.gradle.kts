@@ -13,8 +13,8 @@ android {
         applicationId = "com.fayroz.requests"
         minSdk = 26
         targetSdk = 36
-        versionCode = 14
-        versionName = "0.9.2"
+        versionCode = 15
+        versionName = "0.9.3"
     }
 
     buildFeatures {
@@ -22,6 +22,24 @@ android {
         buildConfig = true
     }
 
+    signingConfigs {
+        val keystorePath = System.getenv("FAYROZ_KEYSTORE_PATH")
+        if (!keystorePath.isNullOrBlank()) {
+            create("release") {
+                storeFile = file(keystorePath)
+                storePassword = System.getenv("FAYROZ_STORE_PASSWORD")
+                keyAlias = System.getenv("FAYROZ_KEY_ALIAS")
+                keyPassword = System.getenv("FAYROZ_KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        getByName("release") {
+            isMinifyEnabled = false
+            signingConfigs.findByName("release")?.let { signingConfig = it }
+        }
+    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
