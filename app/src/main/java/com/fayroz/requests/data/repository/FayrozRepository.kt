@@ -53,7 +53,8 @@ class FayrozRepository(private val database: FayrozDatabase) {
 
     suspend fun ensureStarterCatalog() = database.withTransaction {
         val categoryIds = mutableMapOf<String, Long>()
-        StarterCatalog.categories.forEach { categoryName ->
+        val catalogCategories = (StarterCatalog.categories + MarketCatalogExpansion.categories).distinct()
+        catalogCategories.forEach { categoryName ->
             val existing = dao.findCategoryByName(categoryName)
             val id = existing?.id ?: dao.insertCategory(CategoryEntity(name = categoryName))
             categoryIds[categoryName] = id
@@ -61,7 +62,8 @@ class FayrozRepository(private val database: FayrozDatabase) {
 
         categoryIds["أخرى"]?.let { dao.assignUncategorizedItems(it) }
 
-        StarterCatalog.items.forEach { starter ->
+        val catalogItems = StarterCatalog.items + MarketCatalogExpansion.items
+        catalogItems.forEach { starter ->
             val normalized = ImportText.normalizeItemName(starter.name)
             val existing = dao.findItemByNormalizedName(normalized)
             if (existing == null) {
@@ -87,7 +89,8 @@ class FayrozRepository(private val database: FayrozDatabase) {
     }
 
     suspend fun ensureStarterBrands() = database.withTransaction {
-        StarterCatalog.categories.forEach { categoryName ->
+        val catalogCategories = (StarterCatalog.categories + MarketCatalogExpansion.categories).distinct()
+        catalogCategories.forEach { categoryName ->
             val category = dao.findCategoryByName(categoryName) ?: return@forEach
             BrandCatalog.byCategory[categoryName].orEmpty().forEach { brandName ->
                 if (dao.findCategoryBrand(category.id, brandName) == null) {
