@@ -515,6 +515,20 @@ fun RequestSheetEditorScreen(
                     RequestLineEditorCard(
                         index = index,
                         line = line,
+                        canMoveUp = index > 0,
+                        canMoveDown = index < lines.lastIndex,
+                        onMoveUp = {
+                            if (index > 0) {
+                                val moved = lines.removeAt(index)
+                                lines.add(index - 1, moved)
+                            }
+                        },
+                        onMoveDown = {
+                            if (index < lines.lastIndex) {
+                                val moved = lines.removeAt(index)
+                                lines.add(index + 1, moved)
+                            }
+                        },
                         onChange = { lines[index] = it },
                         onDelete = { lines.removeAt(index) },
                     )
@@ -617,6 +631,10 @@ fun RequestSheetEditorScreen(
 private fun RequestLineEditorCard(
     index: Int,
     line: EditableLineUi,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
     onChange: (EditableLineUi) -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -632,6 +650,34 @@ private fun RequestLineEditorCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(0.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                IconButton(
+                    onClick = onMoveUp,
+                    enabled = canMoveUp,
+                    modifier = Modifier.size(22.dp),
+                ) {
+                    Icon(
+                        Icons.Outlined.KeyboardArrowUp,
+                        "تحريك لأعلى",
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+                IconButton(
+                    onClick = onMoveDown,
+                    enabled = canMoveDown,
+                    modifier = Modifier.size(22.dp),
+                ) {
+                    Icon(
+                        Icons.Outlined.KeyboardArrowDown,
+                        "تحريك لأسفل",
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            }
+
             Text(
                 text = "${index + 1}. ${line.itemName}",
                 modifier = Modifier.weight(1.65f),
