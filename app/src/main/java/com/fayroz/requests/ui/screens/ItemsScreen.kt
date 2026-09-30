@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -242,6 +243,19 @@ fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}
         }
     }
 
+    if (showCategoryOrder) {
+        CategoryOrderDialog(
+            categories = visibleCategories,
+            onDismiss = { showCategoryOrder = false },
+            onSave = { ids ->
+                scope.launch {
+                    repository.reorderCategories(ids)
+                    showCategoryOrder = false
+                }
+            },
+        )
+    }
+
     if (showCompanies) {
         CatalogCompaniesDialog(
             categories = visibleCategories,
@@ -256,11 +270,12 @@ fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}
             item = null,
             categories = visibleCategories,
             onDismiss = { showAdd = false },
-            onSave = { name, unit, specification, categoryId ->
+            onSave = { marketName, technicalName, unit, specification, categoryId ->
                 scope.launch {
                     runCatching {
                         repository.addItem(
-                            name = name,
+                            name = technicalName.ifBlank { marketName },
+                            marketName = marketName,
                             unit = unit,
                             specification = specification,
                             categoryId = categoryId,
@@ -281,11 +296,12 @@ fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}
             item = item,
             categories = visibleCategories,
             onDismiss = { editingItem = null },
-            onSave = { name, unit, specification, categoryId ->
+            onSave = { marketName, technicalName, unit, specification, categoryId ->
                 scope.launch {
                     val error = repository.updateItemDetails(
                         itemId = item.id,
-                        name = name,
+                        name = technicalName.ifBlank { marketName },
+                        marketName = marketName,
                         unit = unit,
                         brand = item.brand,
                         specification = specification,
@@ -345,6 +361,77 @@ fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}
             },
         )
     }
+}
+
+@Composable
+private fun CategoryOrderDialog(
+    categories: List<CategoryEntity>,
+    onDismiss: () -> Unit,
+    onSave: (List<Long>) -> Unit,
+) {
+    val ordered = remember(categories) {
+        mutableStateListOf<CategoryEntity>().apply { addAll(categories) }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("ترتيب أقسام المكتبة") },
+        text = {
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 520.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                itemsIndexed(ordered, key = { _, item -> item.id }) { index, category ->
+                    Surface(
+                        shape = MaterialTheme.shapes.small,
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            MaterialTheme.colorScheme.outlineVariant,
+                        ),
+                    ) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                "${index + 1}. ${category.name}",
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            IconButton(
+                                onClick = {
+                                    if (index > 0) {
+                                        val moved = ordered.removeAt(index)
+                                        ordered.add(index - 1, moved)
+                                    }
+                                },
+                                enabled = index > 0,
+                                modifier = Modifier.size(30.dp),
+                            ) {
+                                Icon(Icons.Outlined.KeyboardArrowUp, "لأعلى")
+                            }
+                            IconButton(
+                                onClick = {
+                                    if (index < ordered.lastIndex) {
+                                        val moved = ordered.removeAt(index)
+                                        ordered.add(index + 1, moved)
+                                    }
+                                },
+                                enabled = index < ordered.lastIndex,
+                                modifier = Modifier.size(30.dp),
+                            ) {
+                                Icon(Icons.Outlined.KeyboardArrowDown, "لأسفل")
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onSave(ordered.map { it.id }) }) { Text("حفظ الترتيب") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } },
+    )
 }
 
 @Composable
@@ -421,12 +508,16 @@ private fun ItemEditorDialog(
     categories: List<CategoryEntity>,
     onDismiss: () -> Unit,
     onSave: (
-        name: String,
+        marketName: String,
+        technicalName: String,
         unit: String,
         specification: String,
         categoryId: Long?,
     ) -> Unit,
 ) {
+    var marketName by remember(item?.id) {
+        mutableStateOf(item?.marketName?.ifBlank { StarterCatalog.marketName(item.name) }.orEmpty())
+    }
     var name by remember(item?.id) { mutableStateOf(item?.name.orEmpty()) }
     var unit by remember(item?.id) { mutableStateOf(item?.defaultUnit.orEmpty()) }
     var specification by remember(item?.id) { mutableStateOf(item?.specification.orEmpty()) }
@@ -468,10 +559,19 @@ private fun ItemEditorDialog(
                 }
 
                 OutlinedTextField(
+                    marketName,
+                    { marketName = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("اسم السوق *") },
+                    placeholder = { Text("مثال: سلك نحاس شعر 2.5 مم²") },
+                    singleLine = true,
+                )
+                OutlinedTextField(
                     name,
                     { name = it },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("اسم الصنف *") },
+                    label = { Text("الاسم الفني / التجاري") },
+                    placeholder = { Text("مثال: H07V-K 450/750V 1×2.5 مم²") },
                     singleLine = true,
                 )
                 OutlinedTextField(
@@ -502,13 +602,14 @@ private fun ItemEditorDialog(
             Button(
                 onClick = {
                     onSave(
+                        marketName.trim(),
                         name.trim(),
                         unit.trim(),
                         specification.trim(),
                         categoryId,
                     )
                 },
-                enabled = name.isNotBlank() && unit.isNotBlank() && categoryId != null,
+                enabled = marketName.isNotBlank() && unit.isNotBlank() && categoryId != null,
             ) {
                 Text("حفظ")
             }
