@@ -139,7 +139,7 @@ interface FayrozDao {
         FROM request_lines rl
         INNER JOIN items i ON i.id = rl.itemId
         WHERE rl.sheetId = :sheetId
-        ORDER BY rl.id
+        ORDER BY rl.sortOrder, rl.id
         """
     )
     suspend fun getRequestLineDetails(sheetId: Long): List<RequestLineDetail>
@@ -358,7 +358,7 @@ interface FayrozDao {
         INNER JOIN request_lines rl ON rl.id = pcl.requestLineId
         INNER JOIN items i ON i.id = rl.itemId
         WHERE pcl.copyId = :copyId
-        ORDER BY rl.id
+        ORDER BY rl.sortOrder, rl.id
         """
     )
     suspend fun getPricingCopyLineDetails(copyId: Long): List<PricingCopyLineDetail>
