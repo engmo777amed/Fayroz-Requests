@@ -125,19 +125,18 @@ fun RequestSheetEditorScreen(
     }
 
     val categories = remember(allCategories) {
-        allCategories
-            .filterNot { it.name in StarterCatalog.hiddenCategories }
-            .sortedWith(compareBy<CategoryEntity> { StarterCatalog.categoryRank(it.name) }.thenBy { it.name })
+        allCategories.filterNot { it.name in StarterCatalog.hiddenCategories }
     }
     val visibleCategoryIds = remember(categories) { categories.map { it.id }.toSet() }
-    val categoryRankById = remember(categories) { categories.associate { it.id to StarterCatalog.categoryRank(it.name) } }
-    val items = remember(allItems, visibleCategoryIds, categoryRankById) {
+    val categoryOrderById = remember(categories) { categories.mapIndexed { index, category -> category.id to index }.toMap() }
+    val items = remember(allItems, visibleCategoryIds, categoryOrderById) {
         allItems
             .filter { it.categoryId == null || it.categoryId in visibleCategoryIds }
             .sortedWith(
-                compareBy<ItemEntity> { categoryRankById[it.categoryId] ?: Int.MAX_VALUE }
+                compareBy<ItemEntity> { categoryOrderById[it.categoryId] ?: Int.MAX_VALUE }
                     .thenBy { StarterCatalog.itemFamilyRank(it.name) }
                     .thenBy { StarterCatalog.firstMarketNumber(it.name) }
+                    .thenBy { it.marketName.ifBlank { StarterCatalog.marketName(it.name) } }
                     .thenBy { it.name }
             )
     }
@@ -590,18 +589,19 @@ fun RequestSheetEditorScreen(
                             localId = nextId++,
                             categoryId = item.categoryId,
                             existingItemId = item.id,
-                            itemName = item.name,
+                            itemName = item.marketName.ifBlank { StarterCatalog.marketName(item.name) },
                             unit = item.defaultUnit,
                         )
                     )
                 }
                 multiPickerOpen = false
             },
-            onCreateItem = { name, unit, specification, categoryId ->
+            onCreateItem = { marketName, technicalName, unit, specification, categoryId ->
                 scope.launch {
                     runCatching {
                         val itemId = repository.addItem(
-                            name = name,
+                            name = technicalName.ifBlank { marketName },
+                            marketName = marketName,
                             unit = unit,
                             specification = specification,
                             categoryId = categoryId,
@@ -611,7 +611,7 @@ fun RequestSheetEditorScreen(
                                 localId = (lines.maxOfOrNull { it.localId } ?: 0L) + 1L,
                                 categoryId = categoryId,
                                 existingItemId = itemId,
-                                itemName = name.trim(),
+                                itemName = marketName.trim(),
                                 unit = unit.trim(),
                             )
                         )
@@ -775,7 +775,7 @@ private fun MultiSelectItemPickerDialog(
     categories: List<CategoryEntity>,
     onDismiss: () -> Unit,
     onAdd: (List<ItemEntity>) -> Unit,
-    onCreateItem: (String, String, String, Long) -> Unit,
+    onCreateItem: (String, String, String, String, Long) -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
     var selectedCategoryId by remember { mutableStateOf<Long?>(null) }
@@ -786,9 +786,10 @@ private fun MultiSelectItemPickerDialog(
     val filtered = remember(catalogItems, query, selectedCategoryId) {
         catalogItems.filter { item ->
             val categoryMatches = selectedCategoryId == null || item.categoryId == selectedCategoryId
-            val marketName = StarterCatalog.marketLabel(item.name)
+            val marketName = item.marketName.ifBlank { StarterCatalog.marketName(item.name) }
             val queryMatches = query.isBlank() ||
                 item.name.contains(query, true) ||
+                item.marketName.contains(query, true) ||
                 item.code.contains(query, true) ||
                 item.specification.contains(query, true) ||
                 marketName.contains(query, true)
@@ -796,7 +797,7 @@ private fun MultiSelectItemPickerDialog(
         }
     }
     val grouped = remember(filtered, categories) {
-        val order = categories.associate { it.id to StarterCatalog.categoryRank(it.name) }
+        val order = categories.mapIndexed { index, category -> category.id to index }.toMap()
         filtered.groupBy { it.categoryId }
             .toList()
             .sortedWith(
@@ -923,17 +924,18 @@ private fun MultiSelectItemPickerDialog(
                                         )
                                         Spacer(Modifier.width(5.dp))
                                         Column(Modifier.weight(1f)) {
+                                            val market = item.marketName.ifBlank {
+                                                StarterCatalog.marketName(item.name)
+                                            }
                                             Text(
-                                                item.name,
+                                                market,
                                                 style = MaterialTheme.typography.bodyMedium,
                                                 maxLines = 1,
                                             )
-                                            val market = StarterCatalog.marketLabel(item.name)
-                                            val secondary = when {
-                                                market.isNotBlank() -> market
-                                                item.specification.isNotBlank() -> item.specification
-                                                else -> ""
-                                            }
+                                            val secondary = buildList {
+                                                if (!market.equals(item.name, ignoreCase = true)) add(item.name)
+                                                if (item.specification.isNotBlank()) add(item.specification)
+                                            }.joinToString(" • ")
                                             if (secondary.isNotBlank()) {
                                                 Text(
                                                     secondary,
@@ -984,9 +986,9 @@ private fun MultiSelectItemPickerDialog(
             suggestedName = query.trim(),
             suggestedCategoryId = selectedCategoryId,
             onDismiss = { showQuickAdd = false },
-            onSave = { name, unit, specification, categoryId ->
+            onSave = { marketName, technicalName, unit, specification, categoryId ->
                 showQuickAdd = false
-                onCreateItem(name, unit, specification, categoryId)
+                onCreateItem(marketName, technicalName, unit, specification, categoryId)
             },
         )
     }
@@ -998,9 +1000,10 @@ private fun QuickCatalogItemDialog(
     suggestedName: String,
     suggestedCategoryId: Long?,
     onDismiss: () -> Unit,
-    onSave: (String, String, String, Long) -> Unit,
+    onSave: (String, String, String, String, Long) -> Unit,
 ) {
-    var name by remember { mutableStateOf(suggestedName) }
+    var marketName by remember { mutableStateOf(suggestedName) }
+    var name by remember { mutableStateOf("") }
     var unit by remember { mutableStateOf("عدد") }
     var specification by remember { mutableStateOf("") }
     var categoryId by remember { mutableStateOf(suggestedCategoryId) }
@@ -1036,9 +1039,16 @@ private fun QuickCatalogItemDialog(
                     }
                 }
                 OutlinedTextField(
+                    value = marketName,
+                    onValueChange = { marketName = it },
+                    label = { Text("اسم السوق *") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+                OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("اسم الصنف *") },
+                    label = { Text("الاسم الفني / التجاري") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                 )
@@ -1067,8 +1077,8 @@ private fun QuickCatalogItemDialog(
         },
         confirmButton = {
             Button(
-                onClick = { onSave(name.trim(), unit.trim(), specification.trim(), categoryId!!) },
-                enabled = name.isNotBlank() && unit.isNotBlank() && categoryId != null,
+                onClick = { onSave(marketName.trim(), name.trim(), unit.trim(), specification.trim(), categoryId!!) },
+                enabled = marketName.isNotBlank() && unit.isNotBlank() && categoryId != null,
             ) { Text("إضافة للمكتبة والكشف") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } },
