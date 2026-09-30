@@ -24,7 +24,7 @@ import com.fayroz.requests.data.model.*
         SupplierDiscountRuleEntity::class,
         SupplierPriceEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
@@ -136,12 +136,20 @@ abstract class FayrozDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE categories ADD COLUMN sortOrder INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("UPDATE categories SET sortOrder = id")
+                db.execSQL("ALTER TABLE items ADD COLUMN marketName TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         fun create(context: Context): FayrozDatabase = Room.databaseBuilder(
             context.applicationContext,
             FayrozDatabase::class.java,
             "fayroz_requests.db",
         )
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
             .build()
     }
 }
