@@ -369,7 +369,7 @@ class FayrozRepository(private val database: FayrozDatabase) {
     ) {
         val sourceReference = "pricing-copy:${copy.id}:$requestLineId"
         val existing = dao.getPriceBySourceReference(sourceReference)
-        val supplierId = copy.supplierId
+        val supplierId = copy.supplierId?.takeIf { dao.getSupplier(it) != null }
         val requestLine = dao.getRequestLine(requestLineId)
         if (supplierId == null || requestLine == null || unitPrice == null) {
             existing?.let { dao.deletePrice(it) }
@@ -860,13 +860,18 @@ class FayrozRepository(private val database: FayrozDatabase) {
                 }
             }
 
+            val pricingCopies = dao.getPricingCopies(draft.id)
             val removedIds = oldIds - retainedIds
             if (removedIds.isNotEmpty()) {
+                pricingCopies.forEach { copy ->
+                    removedIds.forEach { lineId ->
+                        dao.deletePriceBySourceReference("pricing-copy:${copy.id}:$lineId")
+                    }
+                }
                 dao.deleteRequestLinesByIds(removedIds.toList())
             }
 
             if (newLineIds.isNotEmpty()) {
-                val pricingCopies = dao.getPricingCopies(draft.id)
                 pricingCopies.forEach { copy ->
                     dao.insertPricingCopyLines(
                         newLineIds.map { lineId ->
@@ -879,11 +884,20 @@ class FayrozRepository(private val database: FayrozDatabase) {
                 }
             }
 
+            pricingCopies.forEach { copy ->
+                dao.getPricingCopyLineDetails(copy.id).forEach { line ->
+                    syncPricingCopyLineToHistory(copy, line.requestLineId, line.unitPrice)
+                }
+            }
+
             draft.id
         }
     }
 
-    suspend fun deleteSheet(sheetId: Long) {
+    suspend fun deleteSheet(sheetId: Long) = database.withTransaction {
+        dao.getPricingCopies(sheetId).forEach { copy ->
+            dao.deletePricesBySourceReferencePrefix("pricing-copy:${copy.id}:")
+        }
         dao.getSheet(sheetId)?.let { dao.deleteSheet(it) }
     }
 
