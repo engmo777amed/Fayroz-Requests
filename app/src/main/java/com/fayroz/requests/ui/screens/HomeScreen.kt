@@ -17,6 +17,7 @@ fun HomeScreen(
     onPricing: () -> Unit,
     onSuppliers: () -> Unit,
     onItems: () -> Unit,
+    onDataTools: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxSize().padding(18.dp),
@@ -36,7 +37,7 @@ fun HomeScreen(
             }
             AssistChip(
                 onClick = {},
-                label = { Text("V0.8.2") },
+                label = { Text("V0.9.0") },
                 leadingIcon = { Icon(Icons.Outlined.Verified, null) },
             )
         }
@@ -87,6 +88,14 @@ fun HomeScreen(
                 Modifier.weight(1f),
             )
         }
+
+        FeatureCard(
+            "النسخ الاحتياطي",
+            "حفظ واستعادة كل البيانات",
+            Icons.Outlined.Security,
+            onDataTools,
+            Modifier.fillMaxWidth(),
+        )
 
         Text(
             "التسعير موجود داخل كل كشف؛ مش محتاج شاشة منفصلة في التنقل الرئيسي.",
