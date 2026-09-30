@@ -125,11 +125,21 @@ fun RequestSheetEditorScreen(
     }
 
     val categories = remember(allCategories) {
-        allCategories.filterNot { it.name in StarterCatalog.hiddenCategories }
+        allCategories
+            .filterNot { it.name in StarterCatalog.hiddenCategories }
+            .sortedWith(compareBy<CategoryEntity> { StarterCatalog.categoryRank(it.name) }.thenBy { it.name })
     }
     val visibleCategoryIds = remember(categories) { categories.map { it.id }.toSet() }
-    val items = remember(allItems, visibleCategoryIds) {
-        allItems.filter { it.categoryId == null || it.categoryId in visibleCategoryIds }
+    val categoryRankById = remember(categories) { categories.associate { it.id to StarterCatalog.categoryRank(it.name) } }
+    val items = remember(allItems, visibleCategoryIds, categoryRankById) {
+        allItems
+            .filter { it.categoryId == null || it.categoryId in visibleCategoryIds }
+            .sortedWith(
+                compareBy<ItemEntity> { categoryRankById[it.categoryId] ?: Int.MAX_VALUE }
+                    .thenBy { StarterCatalog.itemFamilyRank(it.name) }
+                    .thenBy { StarterCatalog.firstMarketNumber(it.name) }
+                    .thenBy { it.name }
+            )
     }
     val itemById = remember(items) { items.associateBy { it.id } }
     val categoryById = remember(categories) { categories.associateBy { it.id } }
@@ -573,6 +583,32 @@ fun RequestSheetEditorScreen(
                 }
                 multiPickerOpen = false
             },
+            onCreateItem = { name, unit, specification, categoryId ->
+                scope.launch {
+                    runCatching {
+                        val itemId = repository.addItem(
+                            name = name,
+                            unit = unit,
+                            specification = specification,
+                            categoryId = categoryId,
+                        )
+                        lines.add(
+                            EditableLineUi(
+                                localId = (lines.maxOfOrNull { it.localId } ?: 0L) + 1L,
+                                categoryId = categoryId,
+                                existingItemId = itemId,
+                                itemName = name.trim(),
+                                unit = unit.trim(),
+                            )
+                        )
+                    }.onSuccess {
+                        multiPickerOpen = false
+                        Toast.makeText(context, "تمت إضافة الصنف للمكتبة والكشف ✓", Toast.LENGTH_SHORT).show()
+                    }.onFailure {
+                        Toast.makeText(context, "تعذر إضافة الصنف: ${it.message.orEmpty()}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            },
         )
     }
 }
@@ -693,20 +729,34 @@ private fun MultiSelectItemPickerDialog(
     categories: List<CategoryEntity>,
     onDismiss: () -> Unit,
     onAdd: (List<ItemEntity>) -> Unit,
+    onCreateItem: (String, String, String, Long) -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
     var selectedCategoryId by remember { mutableStateOf<Long?>(null) }
+    var showQuickAdd by remember { mutableStateOf(false) }
     val selectedIds = remember { mutableStateListOf<Long>() }
 
+    val categoryById = remember(categories) { categories.associateBy { it.id } }
     val filtered = remember(catalogItems, query, selectedCategoryId) {
         catalogItems.filter { item ->
             val categoryMatches = selectedCategoryId == null || item.categoryId == selectedCategoryId
+            val marketName = StarterCatalog.marketLabel(item.name)
             val queryMatches = query.isBlank() ||
                 item.name.contains(query, true) ||
                 item.code.contains(query, true) ||
-                item.specification.contains(query, true)
+                item.specification.contains(query, true) ||
+                marketName.contains(query, true)
             categoryMatches && queryMatches
         }
+    }
+    val grouped = remember(filtered, categories) {
+        val order = categories.associate { it.id to StarterCatalog.categoryRank(it.name) }
+        filtered.groupBy { it.categoryId }
+            .toList()
+            .sortedWith(
+                compareBy<Pair<Long?, List<ItemEntity>>> { order[it.first] ?: Int.MAX_VALUE }
+                    .thenBy { it.first ?: Long.MAX_VALUE }
+            )
     }
 
     Dialog(
@@ -714,49 +764,47 @@ private fun MultiSelectItemPickerDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         Surface(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(8.dp),
+            modifier = Modifier.fillMaxSize().padding(6.dp),
             shape = MaterialTheme.shapes.large,
             tonalElevation = 6.dp,
         ) {
             Column(Modifier.fillMaxSize()) {
                 Row(
-                    Modifier.fillMaxWidth().padding(12.dp),
+                    Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 7.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    IconButton(onClick = onDismiss) {
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(36.dp)) {
                         Icon(Icons.Outlined.Close, "إغلاق")
                     }
                     Column(Modifier.weight(1f)) {
-                        Text("اختيار الأصناف", style = MaterialTheme.typography.titleLarge)
+                        Text("اختيار الأصناف", style = MaterialTheme.typography.titleMedium)
                         Text(
-                            "حدد أي عدد من الأصناف ثم أضفهم للكشف",
-                            style = MaterialTheme.typography.bodySmall,
+                            "مرتب حسب القسم ونوع الصنف والمقاس",
+                            style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    if (selectedIds.isNotEmpty()) {
-                        Badge { Text(selectedIds.size.toString()) }
+                    TextButton(onClick = { showQuickAdd = true }) {
+                        Icon(Icons.Outlined.AddBox, null, modifier = Modifier.size(17.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("صنف جديد")
                     }
+                    if (selectedIds.isNotEmpty()) Badge { Text(selectedIds.size.toString()) }
                 }
 
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp),
-                    label = { Text("بحث باسم الصنف أو اسم الصنايعي") },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp),
+                    label = { Text("بحث بالاسم الفني أو اسم السوق") },
                     leadingIcon = { Icon(Icons.Outlined.Search, null) },
                     singleLine = true,
                 )
 
-                Spacer(Modifier.height(8.dp))
-
                 LazyRow(
-                    contentPadding = PaddingValues(horizontal = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(top = 5.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
                 ) {
                     item {
                         FilterChip(
@@ -774,62 +822,87 @@ private fun MultiSelectItemPickerDialog(
                     }
                 }
 
-                HorizontalDivider(Modifier.padding(top = 8.dp))
+                HorizontalDivider()
 
                 if (filtered.isEmpty()) {
-                    Box(
-                        Modifier.weight(1f).fillMaxWidth(),
-                        contentAlignment = Alignment.Center,
+                    Column(
+                        Modifier.weight(1f).fillMaxWidth().padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
                     ) {
-                        Text("مفيش أصناف مطابقة للبحث.")
+                        Text("مفيش صنف مطابق.")
+                        Spacer(Modifier.height(6.dp))
+                        FilledTonalButton(onClick = { showQuickAdd = true }) {
+                            Icon(Icons.Outlined.Add, null)
+                            Spacer(Modifier.width(5.dp))
+                            Text("إضافته للمكتبة")
+                        }
                     }
                 } else {
                     LazyColumn(
                         modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 5.dp),
+                        verticalArrangement = Arrangement.spacedBy(3.dp),
                     ) {
-                        items(filtered, key = { it.id }) { item ->
-                            val checked = item.id in selectedIds
-                            Card(
-                                onClick = {
-                                    if (checked) selectedIds.remove(item.id)
-                                    else selectedIds.add(item.id)
-                                },
-                                colors = if (checked) {
-                                    CardDefaults.cardColors(
-                                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                    )
-                                } else {
-                                    CardDefaults.cardColors()
-                                },
-                            ) {
-                                Row(
-                                    Modifier.fillMaxWidth().padding(10.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
+                        grouped.forEach { (categoryId, groupItems) ->
+                            item(key = "header_${categoryId ?: 0}") {
+                                Text(
+                                    categoryId?.let { categoryById[it]?.name } ?: "أخرى",
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 3.dp),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                            items(groupItems, key = { it.id }) { item ->
+                                val checked = item.id in selectedIds
+                                Surface(
+                                    onClick = {
+                                        if (checked) selectedIds.remove(item.id) else selectedIds.add(item.id)
+                                    },
+                                    shape = MaterialTheme.shapes.small,
+                                    color = if (checked) MaterialTheme.colorScheme.secondaryContainer
+                                    else MaterialTheme.colorScheme.surface,
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                                 ) {
-                                    Checkbox(
-                                        checked = checked,
-                                        onCheckedChange = {
-                                            if (checked) selectedIds.remove(item.id)
-                                            else selectedIds.add(item.id)
-                                        },
-                                    )
-                                    Spacer(Modifier.width(8.dp))
-                                    Column(Modifier.weight(1f)) {
-                                        Text(item.name, style = MaterialTheme.typography.titleSmall)
-                                        if (item.specification.isNotBlank()) {
+                                    Row(
+                                        Modifier.fillMaxWidth().padding(horizontal = 7.dp, vertical = 3.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Checkbox(
+                                            checked = checked,
+                                            onCheckedChange = {
+                                                if (checked) selectedIds.remove(item.id) else selectedIds.add(item.id)
+                                            },
+                                            modifier = Modifier.size(28.dp),
+                                        )
+                                        Spacer(Modifier.width(5.dp))
+                                        Column(Modifier.weight(1f)) {
                                             Text(
-                                                item.specification,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                item.name,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                maxLines = 1,
                                             )
+                                            val market = StarterCatalog.marketLabel(item.name)
+                                            val secondary = when {
+                                                market.isNotBlank() -> market
+                                                item.specification.isNotBlank() -> item.specification
+                                                else -> ""
+                                            }
+                                            if (secondary.isNotBlank()) {
+                                                Text(
+                                                    secondary,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    maxLines = 1,
+                                                )
+                                            }
                                         }
+                                        Text(
+                                            item.defaultUnit,
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.primary,
+                                        )
                                     }
-                                    Text(
-                                        item.defaultUnit,
-                                        style = MaterialTheme.typography.labelMedium,
-                                    )
                                 }
                             }
                         }
@@ -838,25 +911,19 @@ private fun MultiSelectItemPickerDialog(
 
                 Surface(tonalElevation = 2.dp) {
                     Row(
-                        Modifier.fillMaxWidth().padding(12.dp),
+                        Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 7.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(
-                            "المحدد: ${selectedIds.size}",
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.titleSmall,
-                        )
+                        Text("المحدد: ${selectedIds.size}", modifier = Modifier.weight(1f))
                         Button(
                             onClick = {
-                                val selected = selectedIds.mapNotNull { id ->
-                                    catalogItems.firstOrNull { it.id == id }
-                                }
-                                onAdd(selected)
+                                onAdd(selectedIds.mapNotNull { id -> catalogItems.firstOrNull { it.id == id } })
                             },
                             enabled = selectedIds.isNotEmpty(),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                         ) {
-                            Icon(Icons.Outlined.AddTask, null)
-                            Spacer(Modifier.width(6.dp))
+                            Icon(Icons.Outlined.AddTask, null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(5.dp))
                             Text("إضافة للكشف")
                         }
                     }
@@ -864,6 +931,102 @@ private fun MultiSelectItemPickerDialog(
             }
         }
     }
+
+    if (showQuickAdd) {
+        QuickCatalogItemDialog(
+            categories = categories,
+            suggestedName = query.trim(),
+            suggestedCategoryId = selectedCategoryId,
+            onDismiss = { showQuickAdd = false },
+            onSave = { name, unit, specification, categoryId ->
+                showQuickAdd = false
+                onCreateItem(name, unit, specification, categoryId)
+            },
+        )
+    }
+}
+
+@Composable
+private fun QuickCatalogItemDialog(
+    categories: List<CategoryEntity>,
+    suggestedName: String,
+    suggestedCategoryId: Long?,
+    onDismiss: () -> Unit,
+    onSave: (String, String, String, Long) -> Unit,
+) {
+    var name by remember { mutableStateOf(suggestedName) }
+    var unit by remember { mutableStateOf("عدد") }
+    var specification by remember { mutableStateOf("") }
+    var categoryId by remember { mutableStateOf(suggestedCategoryId) }
+    var menuOpen by remember { mutableStateOf(false) }
+    val selectedCategory = categories.firstOrNull { it.id == categoryId }
+    val units = listOf("عدد", "م", "م²", "م³", "لفة", "علبة", "كجم", "لتر", "طقم")
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("إضافة صنف للمكتبة") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = { menuOpen = true },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Outlined.Category, null)
+                        Spacer(Modifier.width(6.dp))
+                        Text(selectedCategory?.name ?: "اختيار الكاتجوري *", modifier = Modifier.weight(1f))
+                        Icon(Icons.Outlined.KeyboardArrowDown, null)
+                    }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        categories.forEach { category ->
+                            DropdownMenuItem(
+                                text = { Text(category.name) },
+                                onClick = {
+                                    categoryId = category.id
+                                    menuOpen = false
+                                },
+                            )
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("اسم الصنف *") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    items(units) { value ->
+                        FilterChip(
+                            selected = unit == value,
+                            onClick = { unit = value },
+                            label = { Text(value) },
+                        )
+                    }
+                }
+                OutlinedTextField(
+                    value = specification,
+                    onValueChange = { specification = it },
+                    label = { Text("المواصفة / المقاس (اختياري)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 2,
+                )
+                Text(
+                    "لو الاسم موجود بالفعل، البرنامج يستخدم الصنف الموجود بدل إنشاء دوبليكيت.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onSave(name.trim(), unit.trim(), specification.trim(), categoryId!!) },
+                enabled = name.isNotBlank() && unit.isNotBlank() && categoryId != null,
+            ) { Text("إضافة للمكتبة والكشف") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } },
+    )
 }
 
 @Composable
