@@ -76,7 +76,7 @@ class FayrozRepository(private val database: FayrozDatabase) {
                     ItemEntity(
                         code = generateItemCode(),
                         name = starter.name,
-                        marketName = StarterCatalog.marketName(starter.name),
+                        marketName = starter.marketName.ifBlank { StarterCatalog.marketName(starter.name) },
                         normalizedName = normalized,
                         categoryId = categoryIds[starter.category],
                         defaultUnit = starter.unit,
@@ -84,7 +84,7 @@ class FayrozRepository(private val database: FayrozDatabase) {
                     )
                 )
             } else {
-                val seededMarketName = StarterCatalog.marketName(starter.name)
+                val seededMarketName = starter.marketName.ifBlank { StarterCatalog.marketName(starter.name) }
                 val shouldUpdateSpecification =
                     existing.specification.isBlank() && starter.specification.isNotBlank()
                 val shouldUpdateMarketName =
