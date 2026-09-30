@@ -54,9 +54,14 @@ class FayrozRepository(private val database: FayrozDatabase) {
     suspend fun ensureStarterCatalog() = database.withTransaction {
         val categoryIds = mutableMapOf<String, Long>()
         val catalogCategories = (StarterCatalog.categories + MarketCatalogExpansion.categories).distinct()
-        catalogCategories.forEach { categoryName ->
+        catalogCategories.forEachIndexed { index, categoryName ->
             val existing = dao.findCategoryByName(categoryName)
-            val id = existing?.id ?: dao.insertCategory(CategoryEntity(name = categoryName))
+            val id = existing?.id ?: dao.insertCategory(
+                CategoryEntity(
+                    name = categoryName,
+                    sortOrder = index,
+                )
+            )
             categoryIds[categoryName] = id
         }
 
@@ -71,19 +76,30 @@ class FayrozRepository(private val database: FayrozDatabase) {
                     ItemEntity(
                         code = generateItemCode(),
                         name = starter.name,
+                        marketName = StarterCatalog.marketName(starter.name),
                         normalizedName = normalized,
                         categoryId = categoryIds[starter.category],
                         defaultUnit = starter.unit,
                         specification = starter.specification,
                     )
                 )
-            } else if (existing.specification.isBlank() && starter.specification.isNotBlank()) {
-                dao.updateItem(
-                    existing.copy(
-                        categoryId = existing.categoryId ?: categoryIds[starter.category],
-                        specification = starter.specification,
+            } else {
+                val seededMarketName = StarterCatalog.marketName(starter.name)
+                val shouldUpdateSpecification =
+                    existing.specification.isBlank() && starter.specification.isNotBlank()
+                val shouldUpdateMarketName =
+                    existing.marketName.isBlank() && seededMarketName.isNotBlank() && seededMarketName != starter.name
+                val shouldUpdateCategory =
+                    existing.categoryId == null && categoryIds[starter.category] != null
+                if (shouldUpdateSpecification || shouldUpdateMarketName || shouldUpdateCategory) {
+                    dao.updateItem(
+                        existing.copy(
+                            marketName = if (shouldUpdateMarketName) seededMarketName else existing.marketName,
+                            categoryId = existing.categoryId ?: categoryIds[starter.category],
+                            specification = if (shouldUpdateSpecification) starter.specification else existing.specification,
+                        )
                     )
-                )
+                }
             }
         }
     }
@@ -105,6 +121,17 @@ class FayrozRepository(private val database: FayrozDatabase) {
         }
     }
 
+    suspend fun reorderCategories(orderedIds: List<Long>) = database.withTransaction {
+        val byId = dao.getCategories().associateBy { it.id }
+        orderedIds.forEachIndexed { index, id ->
+            byId[id]?.let { category ->
+                if (category.sortOrder != index) {
+                    dao.updateCategory(category.copy(sortOrder = index))
+                }
+            }
+        }
+    }
+
     suspend fun addCategoryBrand(categoryId: Long, name: String): Long {
         val clean = name.trim()
         if (clean.isBlank()) return 0L
@@ -120,6 +147,7 @@ class FayrozRepository(private val database: FayrozDatabase) {
         brand: String = "",
         specification: String = "",
         categoryId: Long? = null,
+        marketName: String = "",
     ): Long {
         val cleanName = name.trim()
         val normalized = ImportText.normalizeItemName(cleanName)
@@ -131,6 +159,7 @@ class FayrozRepository(private val database: FayrozDatabase) {
             ItemEntity(
                 code = finalCode,
                 name = cleanName,
+                marketName = marketName.trim(),
                 normalizedName = normalized,
                 categoryId = categoryId,
                 defaultUnit = unit.trim(),
@@ -147,6 +176,7 @@ class FayrozRepository(private val database: FayrozDatabase) {
         brand: String = "",
         specification: String = "",
         categoryId: Long? = null,
+        marketName: String = "",
     ): String? {
         val current = dao.getItem(itemId) ?: return "الصنف غير موجود."
         val cleanName = name.trim()
@@ -163,6 +193,7 @@ class FayrozRepository(private val database: FayrozDatabase) {
         dao.updateItem(
             current.copy(
                 name = cleanName,
+                marketName = marketName.trim(),
                 normalizedName = normalized,
                 categoryId = categoryId,
                 defaultUnit = cleanUnit,
