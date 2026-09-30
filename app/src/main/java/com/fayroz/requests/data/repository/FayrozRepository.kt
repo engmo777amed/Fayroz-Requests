@@ -1,7 +1,7 @@
 package com.fayroz.requests.data.repository
 
 import androidx.room.withTransaction
-import com.fayroz.requests.data.db.FayrozDatabase
+import com.fayroz.requests.data.db.FayrozDatabase\nimport com.fayroz.requests.data.backup.DatabaseBackup
 import com.fayroz.requests.data.importer.*
 import com.fayroz.requests.data.model.*
 import com.fayroz.requests.domain.PricingEngine
@@ -20,6 +20,9 @@ class FayrozRepository(private val database: FayrozDatabase) {
     val requestBrands: Flow<List<String>> = dao.observeRequestBrands()
     val sheetSummaries: Flow<List<RequestSheetSummary>> = dao.observeSheetSummaries()
     val suppliers: Flow<List<SupplierEntity>> = dao.observeSuppliers()
+
+    fun writeBackup(output: java.io.OutputStream) = DatabaseBackup.write(database, output)
+    suspend fun restoreBackup(input: java.io.InputStream) = DatabaseBackup.restore(database, input)
 
     suspend fun addProject(name: String, clientName: String = "", location: String = ""): Long {
         return dao.insertProject(
