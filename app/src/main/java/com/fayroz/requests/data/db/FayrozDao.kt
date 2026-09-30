@@ -99,7 +99,16 @@ interface FayrozDao {
                rs.craftsmanName AS craftsmanName,
                rs.workLocation AS workLocation,
                rs.notes AS notes,
-               COUNT(rl.id) AS lineCount
+               COUNT(rl.id) AS lineCount,
+               (SELECT COUNT(*) FROM pricing_copies pc WHERE pc.sheetId = rs.id) AS pricingCopyCount,
+               (
+                   SELECT COUNT(*)
+                   FROM pricing_copies pc
+                   WHERE pc.sheetId = rs.id
+                     AND (SELECT COUNT(*) FROM request_lines r2 WHERE r2.sheetId = rs.id) > 0
+                     AND (SELECT COUNT(*) FROM pricing_copy_lines pcl WHERE pcl.copyId = pc.id AND pcl.unitPrice IS NOT NULL)
+                         = (SELECT COUNT(*) FROM request_lines r3 WHERE r3.sheetId = rs.id)
+               ) AS completePricingCopyCount
         FROM request_sheets rs
         INNER JOIN projects p ON p.id = rs.projectId
         LEFT JOIN request_lines rl ON rl.sheetId = rs.id
@@ -111,6 +120,9 @@ interface FayrozDao {
 
     @Query("SELECT * FROM request_sheets WHERE id = :sheetId LIMIT 1")
     suspend fun getSheet(sheetId: Long): RequestSheetEntity?
+
+    @Query("SELECT * FROM request_lines WHERE id = :requestLineId LIMIT 1")
+    suspend fun getRequestLine(requestLineId: Long): RequestLineEntity?
 
     @Query(
         """
@@ -187,6 +199,12 @@ interface FayrozDao {
 
     @Query("SELECT * FROM supplier_prices WHERE priceListId = :priceListId AND itemId = :itemId LIMIT 1")
     suspend fun getPriceInListForItem(priceListId: Long, itemId: Long): SupplierPriceEntity?
+
+    @Query("SELECT * FROM supplier_prices WHERE sourceReference = :sourceReference LIMIT 1")
+    suspend fun getPriceBySourceReference(sourceReference: String): SupplierPriceEntity?
+
+    @Query("DELETE FROM supplier_prices WHERE sourceReference LIKE :prefix || '%'")
+    suspend fun deletePricesBySourceReferencePrefix(prefix: String)
 
     @Query(
         """
@@ -279,11 +297,16 @@ interface FayrozDao {
         SELECT pc.id AS copyId,
                pc.sheetId AS sheetId,
                pc.placeName AS placeName,
+               pc.supplierId AS supplierId,
+               s.name AS supplierName,
+               pc.quoteNumber AS quoteNumber,
                pc.quoteDate AS quoteDate,
+               pc.notes AS notes,
                COUNT(pcl.id) AS lineCount,
                SUM(CASE WHEN pcl.unitPrice IS NOT NULL THEN 1 ELSE 0 END) AS pricedCount,
                COALESCE(SUM(CASE WHEN pcl.unitPrice IS NULL THEN 0 ELSE pcl.unitPrice * rl.quantity END), 0) AS total
         FROM pricing_copies pc
+        LEFT JOIN suppliers s ON s.id = pc.supplierId
         LEFT JOIN pricing_copy_lines pcl ON pcl.copyId = pc.id
         LEFT JOIN request_lines rl ON rl.id = pcl.requestLineId
         WHERE pc.sheetId = :sheetId
@@ -297,6 +320,7 @@ interface FayrozDao {
     suspend fun getPricingCopy(copyId: Long): PricingCopyEntity?
 
     @Insert suspend fun insertPricingCopy(copy: PricingCopyEntity): Long
+    @Update suspend fun updatePricingCopy(copy: PricingCopyEntity)
     @Delete suspend fun deletePricingCopy(copy: PricingCopyEntity)
 
     @Insert suspend fun insertPricingCopyLines(lines: List<PricingCopyLineEntity>)
