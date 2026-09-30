@@ -19,8 +19,22 @@ object MarketCatalogExpansion {
     )
 
     val items: List<StarterItem> = buildList {
-        fun put(category: String, name: String, unit: String, specification: String = "") {
-            add(StarterItem(category, name, unit, specification))
+        fun put(
+            category: String,
+            name: String,
+            unit: String,
+            specification: String = "",
+            marketName: String = "",
+        ) {
+            add(
+                StarterItem(
+                    category = category,
+                    name = name,
+                    unit = unit,
+                    specification = specification,
+                    marketName = marketName,
+                )
+            )
         }
 
         listOf(
@@ -200,6 +214,48 @@ object MarketCatalogExpansion {
 
         listOf("25","35","50","70","95","120","150","185","240").forEach { section ->
             put("كهرباء - تأسيس", "كابل نحاس 4×$section مم²", "م")
+        }
+
+        // أسلاك نحاس مفردة 450/750V — فصل النوع عن المقاس طبقًا لتصنيفات H07V
+        listOf("1.5","2","2.5","4","6","10").forEach { section ->
+            put(
+                category = "كهرباء - تأسيس",
+                name = "H07V-U 450/750V 1×$section مم²",
+                unit = "لفة",
+                specification = "نحاس مصمت Class 1 • PVC • للتمديدات الثابتة داخل المواسير",
+                marketName = "سلك نحاس مصمت $section مم²",
+            )
+        }
+
+        listOf("1.5","2","2.5","4","6","10","16","25","35").forEach { section ->
+            put(
+                category = "كهرباء - تأسيس",
+                name = "H07V-R 450/750V 1×$section مم²",
+                unit = "لفة",
+                specification = "نحاس مجدول Class 2 • PVC • للتمديدات الثابتة",
+                marketName = "سلك نحاس مجدول $section مم²",
+            )
+        }
+
+        listOf("1.5","2.5","4","6","10","16","25","35","50","70","95","120","150","185","240").forEach { section ->
+            put(
+                category = "كهرباء - تأسيس",
+                name = "H07V-K 450/750V 1×$section مم²",
+                unit = "لفة",
+                specification = "نحاس مرن دقيق الشعيرات Class 5 • PVC • للوحات والتمديدات التي تحتاج مرونة",
+                marketName = "سلك نحاس شعر $section مم²",
+            )
+        }
+
+        // سلك أرضي أخضر/أصفر بنفس مقاطع سلك المباني الشائعة
+        listOf("1.5","2.5","4","6","10","16","25","35","50","70","95","120","150","185","240").forEach { section ->
+            put(
+                category = "كهرباء - تأسيس",
+                name = "PE H07V-K 450/750V 1×$section مم² أخضر/أصفر",
+                unit = "لفة",
+                specification = "موصل حماية أرضي نحاس مرن • أخضر/أصفر",
+                marketName = "سلك أرضي شعر $section مم²",
+            )
         }
 
         listOf(16,25,35,50,70,95,120).forEach { section ->
