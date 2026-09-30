@@ -363,4 +363,26 @@ interface FayrozDao {
         """
     )
     suspend fun getPricingCopyLineDetails(copyId: Long): List<PricingCopyLineDetail>
+
+    @Query(
+        """
+        SELECT pcl.id AS copyLineId,
+               pcl.copyId AS copyId,
+               pcl.requestLineId AS requestLineId,
+               rl.itemId AS itemId,
+               i.name AS itemName,
+               i.categoryId AS categoryId,
+               rl.quantity AS quantity,
+               rl.unit AS unit,
+               rl.usage AS usage,
+               pcl.brand AS brand,
+               pcl.unitPrice AS unitPrice
+        FROM pricing_copy_lines pcl
+        INNER JOIN request_lines rl ON rl.id = pcl.requestLineId
+        INNER JOIN items i ON i.id = rl.itemId
+        WHERE pcl.copyId = :copyId
+        ORDER BY rl.sortOrder, rl.id
+        """
+    )
+    suspend fun getPricingCopyLineDetailsCompatibility(copyId: Long): List<PricingCopyLineDetail>
 }
