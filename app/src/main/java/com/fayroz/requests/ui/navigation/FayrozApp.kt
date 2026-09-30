@@ -34,6 +34,7 @@ private val destinations = listOf(
 
 private val detailRoutes = setOf(
     "projects",
+    "data-tools",
     "pricing",
     "sheet/new",
     "sheet/edit/{sheetId}",
@@ -101,10 +102,17 @@ fun FayrozApp(repository: FayrozRepository) {
                     onPricing = { navController.navigate("pricing") },
                     onSuppliers = { navigateTopLevel("suppliers") },
                     onItems = { navigateTopLevel("items") },
+                    onDataTools = { navController.navigate("data-tools") },
                 )
             }
             composable("projects") {
                 ProjectsScreen(
+                    repository = repository,
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable("data-tools") {
+                DataToolsScreen(
                     repository = repository,
                     onBack = { navController.popBackStack() },
                 )
