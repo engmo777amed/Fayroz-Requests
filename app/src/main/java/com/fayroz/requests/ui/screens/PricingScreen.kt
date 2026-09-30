@@ -862,10 +862,20 @@ fun PricingCopiesComparisonScreen(
     val scope = rememberCoroutineScope()
     var data by remember { mutableStateOf<PricingCopiesComparison?>(null) }
     var loading by remember { mutableStateOf(true) }
+    var loadError by remember { mutableStateOf<String?>(null) }
+    var reloadKey by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(sheetId) {
+    LaunchedEffect(sheetId, reloadKey) {
         loading = true
-        data = repository.loadPricingCopiesComparison(sheetId)
+        loadError = null
+        runCatching {
+            repository.loadPricingCopiesComparison(sheetId)
+        }.onSuccess { loaded ->
+            data = loaded
+        }.onFailure { error ->
+            data = null
+            loadError = error.message ?: error::class.simpleName ?: "خطأ غير معروف"
+        }
         loading = false
     }
 
@@ -910,10 +920,46 @@ fun PricingCopiesComparisonScreen(
         return
     }
 
+    loadError?.let { message ->
+        Column(
+            Modifier.fillMaxSize().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            FayrozDetailHeader("مقارنة التسعيرات", "تعذر تحميل المقارنة", onBack)
+            Card {
+                Column(
+                    Modifier.fillMaxWidth().padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Icon(
+                        Icons.Outlined.ErrorOutline,
+                        null,
+                        tint = MaterialTheme.colorScheme.error,
+                    )
+                    Text(
+                        "حصل خطأ أثناء قراءة بيانات المقارنة، وتم منع إغلاق البرنامج.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Text(
+                        message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Button(onClick = { reloadKey++ }) {
+                        Icon(Icons.Outlined.Refresh, null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("إعادة المحاولة")
+                    }
+                }
+            }
+        }
+        return
+    }
+
     val comparison = data
     if (comparison == null) {
         Column(Modifier.fillMaxSize().padding(16.dp)) {
-            FayrozDetailHeader("مقارنة التسعيرات", "تعذر تحميل الكشف", onBack)
+            FayrozDetailHeader("مقارنة التسعيرات", "الكشف غير موجود أو لا يمكن قراءته", onBack)
         }
         return
     }
