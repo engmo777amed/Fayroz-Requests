@@ -11,7 +11,12 @@ data class RequestSheetSummary(
     val workLocation: String,
     val notes: String,
     val lineCount: Int,
-)
+    val pricingCopyCount: Int,
+    val completePricingCopyCount: Int,
+) {
+    val hasPricing: Boolean get() = pricingCopyCount > 0
+    val hasCompletePricing: Boolean get() = completePricingCopyCount > 0
+}
 
 data class RequestLineDetail(
     val lineId: Long,
