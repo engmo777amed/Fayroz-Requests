@@ -11,13 +11,17 @@ class FayrozRequestsApp : Application() {
     suspend fun ensureStarterCatalogOnce() {
         val prefs = getSharedPreferences("fayroz_requests_setup", MODE_PRIVATE)
         val catalogReady = prefs.getBoolean("starter_catalog_v4_seeded", false)
+        val marketCatalogReady = prefs.getBoolean("market_catalog_v6_seeded", false)
 
-        if (!catalogReady || !repository.hasAnyItems()) {
+        if (!catalogReady || !marketCatalogReady || !repository.hasAnyItems()) {
             repository.ensureStarterCatalog()
-            prefs.edit().putBoolean("starter_catalog_v4_seeded", true).apply()
+            prefs.edit()
+                .putBoolean("starter_catalog_v4_seeded", true)
+                .putBoolean("market_catalog_v6_seeded", true)
+                .apply()
         }
 
-        // Idempotent: adds only missing brand names and preserves anything the user added.
+        // Idempotent: adds only missing company/brand names and preserves user additions.
         repository.ensureStarterBrands()
     }
 }
