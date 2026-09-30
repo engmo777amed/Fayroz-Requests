@@ -22,6 +22,9 @@ jobs:
           cp "$TOOLS_DIR/zipalign" "$RUNNER_TEMP/android-signing-tools/"
           cp "$TOOLS_DIR/apksigner" "$RUNNER_TEMP/android-signing-tools/"
           cp "$TOOLS_DIR/lib/apksigner.jar" "$RUNNER_TEMP/android-signing-tools/lib/"
+          LIBCPP="$(find "$TOOLS_DIR" -name 'libc++.so' -type f | head -n 1)"
+          test -n "$LIBCPP"
+          cp "$LIBCPP" "$RUNNER_TEMP/android-signing-tools/"
           chmod +x "$RUNNER_TEMP/android-signing-tools/zipalign" "$RUNNER_TEMP/android-signing-tools/apksigner"
       - name: Upload official Android signing tools
         uses: actions/upload-artifact@v4
