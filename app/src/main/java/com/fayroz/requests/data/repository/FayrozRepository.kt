@@ -752,6 +752,7 @@ class FayrozRepository(private val database: FayrozDatabase) {
         val sheet = dao.getSheet(sheetId) ?: return null
         val lines = dao.getRequestLineDetails(sheetId).map {
             RequestLineDraft(
+                existingLineId = it.lineId,
                 existingItemId = it.itemId,
                 itemName = it.itemName,
                 quantity = it.quantity,
@@ -777,24 +778,7 @@ class FayrozRepository(private val database: FayrozDatabase) {
     }
 
     suspend fun saveSheet(draft: RequestSheetDraft): Long = database.withTransaction {
-        val lineEntities = draft.lines.map { draftLine ->
-            val itemId = resolveItemId(draftLine)
-            RequestLineEntity(
-                sheetId = draft.id,
-                itemId = itemId,
-                quantity = draftLine.quantity,
-                unit = draftLine.unit.trim(),
-                brand = draftLine.brand.trim(),
-                usage = "",
-                lineDescription = draftLine.lineDescription.trim(),
-                notes = draftLine.notes.trim(),
-            )
-        }
-
         if (draft.id == 0L) {
-            // The database is the source of truth for numbering.
-            // Calculate the next number inside the same transaction that inserts the sheet,
-            // so an old UI suggestion can never create a duplicate sheet number.
             val finalSheetNumber = (dao.maxNumericSheetNumber(draft.projectId) + 1)
                 .toString()
                 .padStart(3, '0')
@@ -811,7 +795,20 @@ class FayrozRepository(private val database: FayrozDatabase) {
                     notes = draft.notes.trim(),
                 )
             )
-            dao.insertRequestLines(lineEntities.map { it.copy(sheetId = newId) })
+
+            val newLines = draft.lines.map { draftLine ->
+                RequestLineEntity(
+                    sheetId = newId,
+                    itemId = resolveItemId(draftLine),
+                    quantity = draftLine.quantity,
+                    unit = draftLine.unit.trim(),
+                    brand = draftLine.brand.trim(),
+                    usage = "",
+                    lineDescription = draftLine.lineDescription.trim(),
+                    notes = draftLine.notes.trim(),
+                )
+            }
+            dao.insertRequestLines(newLines)
             newId
         } else {
             val existing = dao.getSheet(draft.id) ?: error("الكشف غير موجود")
@@ -835,8 +832,53 @@ class FayrozRepository(private val database: FayrozDatabase) {
                     notes = draft.notes.trim(),
                 )
             )
-            dao.deleteLinesForSheet(draft.id)
-            dao.insertRequestLines(lineEntities.map { it.copy(sheetId = draft.id) })
+
+            val oldIds = dao.getRequestLineDetails(draft.id).map { it.lineId }.toSet()
+            val retainedIds = mutableSetOf<Long>()
+            val newLineIds = mutableListOf<Long>()
+
+            draft.lines.forEach { draftLine ->
+                val itemId = resolveItemId(draftLine)
+                val existingLineId = draftLine.existingLineId?.takeIf { it in oldIds }
+                val entity = RequestLineEntity(
+                    id = existingLineId ?: 0L,
+                    sheetId = draft.id,
+                    itemId = itemId,
+                    quantity = draftLine.quantity,
+                    unit = draftLine.unit.trim(),
+                    brand = draftLine.brand.trim(),
+                    usage = "",
+                    lineDescription = draftLine.lineDescription.trim(),
+                    notes = draftLine.notes.trim(),
+                )
+
+                if (existingLineId != null) {
+                    dao.updateRequestLine(entity)
+                    retainedIds += existingLineId
+                } else {
+                    newLineIds += dao.insertRequestLine(entity.copy(id = 0L))
+                }
+            }
+
+            val removedIds = oldIds - retainedIds
+            if (removedIds.isNotEmpty()) {
+                dao.deleteRequestLinesByIds(removedIds.toList())
+            }
+
+            if (newLineIds.isNotEmpty()) {
+                val pricingCopies = dao.getPricingCopies(draft.id)
+                pricingCopies.forEach { copy ->
+                    dao.insertPricingCopyLines(
+                        newLineIds.map { lineId ->
+                            PricingCopyLineEntity(
+                                copyId = copy.id,
+                                requestLineId = lineId,
+                            )
+                        }
+                    )
+                }
+            }
+
             draft.id
         }
     }
