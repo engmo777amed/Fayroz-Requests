@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: android-ci-v093-${{ github.ref }}
+  group: android-ci-v094-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -68,7 +68,7 @@ jobs:
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: FayrozRequests-v0.9.3-debug
+          name: FayrozRequests-v0.9.4-debug
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
@@ -79,7 +79,7 @@ jobs:
       - name: Upload unsigned release APK
         uses: actions/upload-artifact@v4
         with:
-          name: FayrozRequests-v0.9.3-release-unsigned
+          name: FayrozRequests-v0.9.4-release-unsigned
           path: app/build/outputs/apk/release/app-release-unsigned.apk
           if-no-files-found: error
           retention-days: 30
@@ -124,7 +124,7 @@ jobs:
         if: ${{ env.RELEASE_KEYSTORE_B64 != '' }}
         uses: actions/upload-artifact@v4
         with:
-          name: FayrozRequests-v0.9.3-release
+          name: FayrozRequests-v0.9.4-release
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
