@@ -1,0 +1,32 @@
+name: Export Android Signing Tools
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/signing-tools.yml"
+
+jobs:
+  export-tools:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Collect official Android signing tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOOLS_DIR="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          echo "Using $TOOLS_DIR"
+          mkdir -p "$RUNNER_TEMP/android-signing-tools/lib"
+          cp "$TOOLS_DIR/zipalign" "$RUNNER_TEMP/android-signing-tools/"
+          cp "$TOOLS_DIR/apksigner" "$RUNNER_TEMP/android-signing-tools/"
+          cp "$TOOLS_DIR/lib/apksigner.jar" "$RUNNER_TEMP/android-signing-tools/lib/"
+          chmod +x "$RUNNER_TEMP/android-signing-tools/zipalign" "$RUNNER_TEMP/android-signing-tools/apksigner"
+      - name: Upload official Android signing tools
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-signing-tools-standalone
+          path: ${{ runner.temp }}/android-signing-tools
+          if-no-files-found: error
+          retention-days: 7
