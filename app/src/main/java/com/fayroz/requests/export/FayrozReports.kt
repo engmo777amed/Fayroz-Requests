@@ -103,7 +103,7 @@ object FayrozReports {
         rows += listOf(Cell("FAYROZ REQUESTS"), Cell("مقارنة تسعيرات"))
         rows += listOf(Cell("المشروع"), Cell(data.project.name))
         rows += listOf(Cell("رقم الكشف"), Cell(data.sheet.sheetNumber))
-        rows += emptyList()
+        rows.add(emptyList())
         rows += listOf(Cell("المحل / المورد"), Cell("التغطية"), Cell("الحالة"), Cell("الإجمالي"), Cell("الأقل في بنود"))
         data.copies.forEach { copy ->
             rows += listOf(
@@ -114,7 +114,7 @@ object FayrozReports {
                 Cell(data.cheapestLineCount(copy.copy.id).toDouble()),
             )
         }
-        rows += emptyList()
+        rows.add(emptyList())
         val headers = mutableListOf(Cell("الصنف"), Cell("الكمية"), Cell("الوحدة"))
         data.copies.forEach { headers += Cell(it.copy.placeName) }
         rows += headers
@@ -126,7 +126,7 @@ object FayrozReports {
             }
             rows += row
         }
-        rows += emptyList()
+        rows.add(emptyList())
         data.lowestCompleteTotal?.let { rows += listOf(Cell("أقل عرض كامل"), Cell(it)) }
         data.completeRangeSaving?.let { rows += listOf(Cell("الفرق بين العروض الكاملة"), Cell(it)) }
         data.bestMixTotal?.let { rows += listOf(Cell("أقل تجميعة بند-بند"), Cell(it)) }
