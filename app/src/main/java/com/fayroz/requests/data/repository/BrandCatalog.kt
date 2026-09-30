@@ -62,6 +62,15 @@ object BrandCatalog {
             "Krah",
             "Wavin",
         ),
+        "شبكات مياه وري" to listOf(
+            "Misr El-Hegaz",
+            "GF Piping Systems",
+            "Wavin",
+            "AVK",
+            "Hawle",
+            "Rain Bird",
+            "Hunter",
+        ),
         "أدوات صحية" to listOf(
             "Lecico",
             "Ideal Standard",
@@ -78,6 +87,14 @@ object BrandCatalog {
             "Tyco",
             "Rapidrop",
             "Reliable",
+        ),
+        "إنذار حريق" to listOf(
+            "Honeywell Notifier",
+            "Bosch",
+            "Hochiki",
+            "Apollo",
+            "GST",
+            "Siemens",
         ),
         "كهرباء - تأسيس" to listOf(
             "Elsewedy Electric",
@@ -119,6 +136,15 @@ object BrandCatalog {
             "Sonoff",
             "Shelly",
             "Schneider Electric",
+        ),
+        "مولدات وUPS" to listOf(
+            "Cummins",
+            "Caterpillar",
+            "Perkins",
+            "FG Wilson",
+            "APC by Schneider Electric",
+            "Eaton",
+            "Vertiv",
         ),
         "تكييف وتهوية" to listOf(
             "Carrier",
