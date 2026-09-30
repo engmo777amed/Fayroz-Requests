@@ -5,6 +5,7 @@ data class StarterItem(
     val name: String,
     val unit: String,
     val specification: String = "",
+    val marketName: String = "",
 )
 
 object StarterCatalog {
@@ -210,7 +211,13 @@ object StarterCatalog {
             specification.takeIf { it.isNotBlank() },
             alias.takeIf { it.isNotBlank() }?.let { "اسم الصنايعي: $it" },
         ).joinToString(" • ")
-        return StarterItem(category, name, unit, finalSpec)
+        return StarterItem(
+            category = category,
+            name = name,
+            unit = unit,
+            specification = finalSpec,
+            marketName = marketName(name),
+        )
     }
 
     val items: List<StarterItem> = buildList {
