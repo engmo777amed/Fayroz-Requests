@@ -18,9 +18,15 @@ object StarterCatalog {
     )
 
     val categories = listOf(
+        "مواد بناء ومباني",
+        "خرسانة وحديد تسليح",
+        "محارة وبياض",
+        "عزل مائي وحراري",
         "سباكة - تغذية",
         "سباكة - صرف",
+        "صرف خارجي وشبكات",
         "أدوات صحية",
+        "مكافحة حريق",
         "كهرباء - تأسيس",
         "كهرباء - لوحات وحماية",
         "كهرباء - مفاتيح وبرايز",
@@ -28,6 +34,7 @@ object StarterCatalog {
         "تيار خفيف وسمارت",
         "تكييف وتهوية",
         "سيراميك وبورسلين",
+        "أرضيات خشبية وبدائل",
         "رخام وجرانيت وحجر",
         "جبس بورد وأسقف",
         "دهانات",
@@ -56,6 +63,10 @@ object StarterCatalog {
      * main product first, then fittings/accessories, then by size/rating.
      */
     fun itemFamilyRank(name: String): Int = when {
+        name.startsWith("أسمنت") -> 10
+        name.startsWith("حديد تسليح") -> 10
+        name.startsWith("خرسانة جاهزة") -> 20
+        name.startsWith("طوب") || name.startsWith("بلوك") -> 30
         name.startsWith("ماسورة") -> 10
         name.startsWith("سلك ") -> 10
         name.startsWith("كابل ") -> 12
