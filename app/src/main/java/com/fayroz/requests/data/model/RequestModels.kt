@@ -50,6 +50,7 @@ data class RequestSheetDraft(
     val trade: String = "",
     val craftsmanName: String = "",
     val workLocation: String = "",
+    val attachmentUri: String? = null,
     val notes: String = "",
     val lines: List<RequestLineDraft>,
 )
