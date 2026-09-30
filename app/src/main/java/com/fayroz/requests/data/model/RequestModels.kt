@@ -32,6 +32,7 @@ data class RequestLineDetail(
 )
 
 data class RequestLineDraft(
+    val existingLineId: Long? = null,
     val existingItemId: Long? = null,
     val itemName: String,
     val quantity: Double,
