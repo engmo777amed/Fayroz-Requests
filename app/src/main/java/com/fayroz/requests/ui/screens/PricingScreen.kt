@@ -761,7 +761,7 @@ private fun PricingCopyLineCard(
                     Icon(Icons.Outlined.LocalOffer, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(5.dp))
                     Text(
-                        line.brand.ifBlank { "الماركة" },
+                        line.brand.ifBlank { "الماركة / الشركة" },
                         maxLines = 1,
                         modifier = Modifier.weight(1f),
                     )
@@ -801,7 +801,7 @@ private fun BrandLibraryDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("ماركة — $title") },
+        title = { Text("ماركة / شركة — $title") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (brands.isEmpty()) {
@@ -832,7 +832,7 @@ private fun BrandLibraryDialog(
                         value = newBrand,
                         onValueChange = { newBrand = it },
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("إضافة ماركة للمكتبة") },
+                        label = { Text("إضافة ماركة / شركة للمكتبة") },
                         singleLine = true,
                     )
                     Button(
@@ -1116,7 +1116,7 @@ fun PricingCopiesComparisonScreen(
                                     Column(Modifier.weight(1f)) {
                                         Text(copy.copy.placeName, style = MaterialTheme.typography.labelLarge)
                                         Text(
-                                            line.brand.ifBlank { "بدون ماركة" },
+                                            line.brand.ifBlank { "بدون ماركة / شركة" },
                                             style = MaterialTheme.typography.bodySmall,
                                         )
                                     }
