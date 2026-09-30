@@ -46,6 +46,47 @@ object StarterCatalog {
         "أخرى",
     )
 
+    fun categoryRank(name: String): Int {
+        val rank = categories.indexOf(name)
+        return if (rank >= 0) rank else categories.size + 100
+    }
+
+    /**
+     * Keeps items in the same practical order used when buying from the market:
+     * main product first, then fittings/accessories, then by size/rating.
+     */
+    fun itemFamilyRank(name: String): Int = when {
+        name.startsWith("ماسورة") -> 10
+        name.startsWith("سلك ") -> 10
+        name.startsWith("كابل ") -> 12
+        name.startsWith("MCB") -> 10
+        name.startsWith("MCCB") -> 12
+        name.startsWith("RCCB") -> 14
+        name.startsWith("RCBO") -> 16
+        name.startsWith("لوحة توزيع") -> 20
+        name.startsWith("كوع") -> 20
+        name.startsWith("تي ") || name.startsWith("تي PPR") -> 30
+        name.startsWith("واي") -> 35
+        name.startsWith("جلبة") || name.startsWith("سوكت") -> 40
+        name.startsWith("مسّلوب") -> 45
+        name.startsWith("محبس") -> 50
+        name.startsWith("كلبسة") -> 60
+        name.startsWith("علبة") -> 20
+        name.startsWith("مفتاح") -> 20
+        name.startsWith("بريزة") -> 30
+        name.startsWith("فريم") -> 40
+        name.startsWith("ميكانيزم") -> 45
+        name.startsWith("سبوت") || name.startsWith("Downlight") -> 10
+        name.startsWith("Track Light") || name.startsWith("مسار Track") -> 20
+        name.startsWith("شريط LED") -> 30
+        name.startsWith("بروفايل LED") -> 40
+        name.startsWith("Driver") -> 50
+        else -> 100
+    }
+
+    fun firstMarketNumber(name: String): Double =
+        Regex("""\d+(?:\.\d+)?""").find(name)?.value?.toDoubleOrNull() ?: Double.MAX_VALUE
+
     private fun marketAlias(name: String): String = when {
         name.startsWith("ماسورة PPR") -> "ماسورة حراري"
         name.startsWith("كوع PPR") -> "كوع حراري"
@@ -66,28 +107,28 @@ object StarterCatalog {
         name.startsWith("طبة تسليك") -> "طبة تسليك"
         name.startsWith("سيفون أرضية") -> "بيبة"
         name == "جالي تراب" -> "جالي تراب / جالي"
-        name.startsWith("شاسيه مرحاض دفن") -> "شاسيه دفن"
-        name.startsWith("مرحاض معلق") -> "قاعدة معلقة"
+        name.startsWith("شاسيه مرحاض دفن") -> "شاسيه دفن / صندوق طرد مدفون"
+        name.startsWith("مرحاض معلق") -> "قاعدة معلقة / Wall Hung WC"
         name.startsWith("مرحاض أرضي") -> "قاعدة حمام"
         name.startsWith("خلاط شاور دفن") -> "خلاط دفن"
         name.startsWith("هاند شاور") -> "سماعة"
         name.startsWith("مسطرة شاور") -> "مسطرة دش"
-        name.startsWith("سلك نحاس") -> "سلك"
+        name.startsWith("سلك نحاس") -> "سلك نحاس مفرد / Building Wire 450/750V"
         name.startsWith("سلك أرضي") -> "سلك أرضي / إيرث"
         name.startsWith("ماسورة PVC كهرباء") -> "ماسورة كهربا"
         name.startsWith("خرطوم كهرباء") -> "خرطوم كهربا"
         name.startsWith("علبة ماجيك") -> "علبة ماجيك"
         name.startsWith("Junction Box") -> "علبة بواط"
-        name.startsWith("MCB") -> "مفتاح أوتوماتيك"
-        name.startsWith("MCCB") -> "مفتاح كومباكت"
-        name.startsWith("RCCB") -> "مفتاح تسريب"
-        name.startsWith("RCBO") -> "مفتاح أوتوماتيك تسريب"
+        name.startsWith("MCB") -> "قاطع أوتوماتيك MCB / مفتاح أوتوماتيك"
+        name.startsWith("MCCB") -> "قاطع كومباكت MCCB / مفتاح كومباكت"
+        name.startsWith("RCCB") -> "قاطع تسريب أرضي RCCB / مفتاح تسريب"
+        name.startsWith("RCBO") -> "قاطع RCBO تسريب + زيادة تيار / مفتاح أوتوماتيك تسريب"
         name.startsWith("SPD") -> "مانع صواعق"
         name.startsWith("كونتاكتور") -> "كونتاكتور"
         name.startsWith("بار نحاس") -> "بار نحاس"
         name.startsWith("بار أرضي") -> "بار أرضي"
         name.startsWith("بار نيوترال") -> "بار نيوترال"
-        name.startsWith("بريزة Schuko") -> "بريزة شوكو"
+        name.startsWith("بريزة Schuko") -> "بريزة شوكو 16A / Schuko"
         name.startsWith("Faceplate") -> "وش داتا"
         name.startsWith("Downlight") -> "سبوت داون لايت"
         name.startsWith("Track Light") -> "سبوت تراك"
@@ -125,6 +166,8 @@ object StarterCatalog {
         name.startsWith("U-Bolt") -> "يو بولت"
         else -> ""
     }
+
+    fun marketLabel(name: String): String = marketAlias(name)
 
     private fun item(category: String, name: String, unit: String, specification: String = ""): StarterItem {
         val alias = marketAlias(name)
