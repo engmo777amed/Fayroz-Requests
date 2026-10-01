@@ -163,7 +163,27 @@ object PriceListImportEngine {
         matchedItemName = item.marketName.ifBlank { item.name },
         matchKind = kind,
         confidence = confidence,
+        validationMessage = if (
+            unit.isNotBlank() &&
+            normalizeUnit(unit) != normalizeUnit(item.defaultUnit)
+        ) {
+            "تنبيه: وحدة سعر المورد «$unit» مختلفة عن وحدة الصنف «${item.defaultUnit}». سيُحفظ السعر بوحدته ولن يدخل مقارنة بوحدة مختلفة."
+        } else "",
     )
+
+    private fun normalizeUnit(value: String): String = value
+        .trim()
+        .lowercase()
+        .replace("م.ط", "م")
+        .replace("م ط", "م")
+        .replace("متر طولي", "م")
+        .replace("متر", "م")
+        .replace("لفه", "لفة")
+        .replace("وحده", "وحدة")
+        .replace("م٢", "م²")
+        .replace("م2", "م²")
+        .replace("م٣", "م³")
+        .replace("م3", "م³")
 
     private fun similarity(a: String, b: String): Double {
         if (a.isBlank() || b.isBlank()) return 0.0
