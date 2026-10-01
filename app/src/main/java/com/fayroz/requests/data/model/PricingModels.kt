@@ -17,6 +17,7 @@ data class PriceListEntryDetail(
     val itemName: String,
     val itemCode: String,
     val unit: String,
+    val brand: String,
     val listPrice: Double,
     val appliedDiscountPercent: Double,
     val netPrice: Double,
@@ -37,6 +38,8 @@ data class PricingOffer(
     val totalNet: Double,
     val priceDate: Long,
     val source: PriceSource,
+    val brand: String = "",
+    val priceUnit: String = "",
 )
 
 data class PricingLineComparison(
@@ -80,6 +83,8 @@ data class ItemPriceHistoryDetail(
     val supplierId: Long,
     val supplierName: String,
     val priceListName: String?,
+    val brand: String,
+    val unit: String,
     val listPrice: Double,
     val appliedDiscountPercent: Double,
     val netPrice: Double,
