@@ -456,6 +456,10 @@ private fun ImportCandidateCard(
                 ImportMatchKind.INVALID -> MatchLabel(Icons.Outlined.ErrorOutline, candidate.validationMessage, error = true)
             }
 
+            if (candidate.matchKind != ImportMatchKind.INVALID && candidate.validationMessage.isNotBlank()) {
+                MatchLabel(Icons.Outlined.WarningAmber, candidate.validationMessage, error = true)
+            }
+
             if (resolvedName != null && candidate.matchKind !in setOf(ImportMatchKind.EXACT_CODE, ImportMatchKind.EXACT_NAME)) {
                 MatchLabel(if (resolution.skip) Icons.Outlined.SkipNext else Icons.Outlined.CheckCircle, resolvedName)
             }
@@ -514,7 +518,9 @@ private fun ImportItemPickerDialog(
 ) {
     var query by remember { mutableStateOf("") }
     val filtered = remember(items, query) {
-        if (query.isBlank()) items else items.filter { it.name.contains(query, true) || it.code.contains(query, true) }
+        if (query.isBlank()) items else items.filter {
+            it.name.contains(query, true) || it.marketName.contains(query, true) || it.code.contains(query, true)
+        }
     }
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = MaterialTheme.shapes.extraLarge, tonalElevation = 6.dp) {
