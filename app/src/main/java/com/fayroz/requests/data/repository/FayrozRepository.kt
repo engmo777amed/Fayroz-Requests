@@ -23,7 +23,14 @@ class FayrozRepository(private val database: FayrozDatabase) {
     val suppliers: Flow<List<SupplierEntity>> = dao.observeSuppliers()
 
     fun writeBackup(output: java.io.OutputStream) = DatabaseBackup.write(database, output)
-    suspend fun restoreBackup(input: java.io.InputStream) = DatabaseBackup.restore(database, input)
+
+    suspend fun restoreBackup(input: java.io.InputStream) {
+        DatabaseBackup.restore(database, input)
+        // أي Backup قديم يرجع عبر نفس بوابة الـMaster Catalog الجديدة.
+        ensureStarterCatalog()
+        ensureStarterBrands()
+        ensureCatalogGovernance()
+    }
 
     suspend fun addProject(name: String, clientName: String = "", location: String = ""): Long {
         return dao.insertProject(
