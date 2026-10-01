@@ -45,13 +45,6 @@ object CatalogGovernance {
      * المفتاح = الاسم الفني القديم، القيمة = الاسم الفني الـMaster.
      */
     val mergeAliases: Map<String, String> = buildMap {
-        listOf("1.5","2.5","4","6","10","16","25","35","50","70","95","120","150").forEach { s ->
-            put("سلك نحاس $s مم²", "H07V-R 450/750V 1×$s مم²")
-        }
-        listOf("1.5","2.5","4","6","10","16","25","35","50","70","95","120","150").forEach { s ->
-            put("سلك أرضي $s مم²", "PE H07V-K 450/750V 1×$s مم² أخضر/أصفر")
-        }
-
         put("Stud 50 مم", "CW Stud 50 مم")
         put("Stud 70 مم", "CW Stud 75 مم")
         put("Stud 100 مم", "CW Stud 100 مم")
@@ -65,23 +58,32 @@ object CatalogGovernance {
         put("لاصق سيراميك عادي", "لاصق سيراميك C1")
         put("لاصق سيراميك مرن", "لاصق سيراميك C2")
         put("لاصق بورسلين", "لاصق بورسلين مرن C2TE")
-        put("جراوت فواصل أبيض", "جراوت أسمنتي فواصل")
-        put("جراوت فواصل ملون", "جراوت أسمنتي فواصل")
     }
 
     /**
      * أصناف قديمة عامة لا يمكن تحويلها لصنف أدق بدون افتراض مواصفة.
      * نخفيها من الاختيار الجديد، وتظل موجودة لأي كشف/سعر تاريخي مرتبط بها.
      */
-    val archiveNames: Set<String> = setOf(
-        "لوح أسمنتي Cement Board",
-        "مسّلوب صرف UPVC 32 مم",
-        "مسّلوب صرف UPVC 40 مم",
-        "مسّلوب صرف UPVC 50 مم",
-        "مسّلوب صرف UPVC 75 مم",
-        "مسّلوب صرف UPVC 110 مم",
-        "مسّلوب صرف UPVC 160 مم",
-    )
+    val archiveNames: Set<String> = buildSet {
+        // Generic legacy electrical items did not record conductor class.
+        // Keep their historic prices untouched instead of reinterpreting old "لفة" prices as "م".
+        listOf("1.5","2.5","4","6","10","16","25","35","50","70","95","120","150").forEach { s ->
+            add("سلك نحاس $s مم²")
+            add("سلك أرضي $s مم²")
+        }
+
+        // Generic legacy grout was stored with a different purchasing unit.
+        add("جراوت فواصل أبيض")
+        add("جراوت فواصل ملون")
+
+        add("لوح أسمنتي Cement Board")
+        add("مسّلوب صرف UPVC 32 مم")
+        add("مسّلوب صرف UPVC 40 مم")
+        add("مسّلوب صرف UPVC 50 مم")
+        add("مسّلوب صرف UPVC 75 مم")
+        add("مسّلوب صرف UPVC 110 مم")
+        add("مسّلوب صرف UPVC 160 مم")
+    }
 
     /** تصحيح الـMaster category والوحدة للأصناف التي كانت متداخلة أو لها Unit خاطئة. */
     val exactOverrides: Map<String, ItemOverride> = buildMap {
