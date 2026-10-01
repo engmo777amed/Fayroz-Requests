@@ -41,7 +41,14 @@ object PriceListImportEngine {
         existingItems: List<ItemEntity>,
     ): List<PriceImportCandidate> {
         val byCode = existingItems.filter { it.code.isNotBlank() }.associateBy { ImportText.normalizeCode(it.code) }
-        val byName = existingItems.associateBy { ImportText.normalizeItemName(it.name) }
+        val byName = buildMap<String, ItemEntity> {
+            existingItems.forEach { item ->
+                put(ImportText.normalizeItemName(item.name), item)
+                if (item.marketName.isNotBlank()) {
+                    put(ImportText.normalizeItemName(item.marketName), item)
+                }
+            }
+        }
 
         return data.rows.mapIndexedNotNull { index, row ->
             if (row.all { it.isBlank() }) return@mapIndexedNotNull null
@@ -85,7 +92,12 @@ object PriceListImportEngine {
             }
 
             val ranked = existingItems.asSequence()
-                .map { item -> item to similarity(normalizedName, ImportText.normalizeItemName(item.name)) }
+                .map { item ->
+                    val technicalScore = similarity(normalizedName, ImportText.normalizeItemName(item.name))
+                    val marketScore = if (item.marketName.isBlank()) 0.0
+                    else similarity(normalizedName, ImportText.normalizeItemName(item.marketName))
+                    item to maxOf(technicalScore, marketScore)
+                }
                 .filter { it.second >= 0.58 }
                 .sortedByDescending { it.second }
                 .take(2)
@@ -105,7 +117,7 @@ object PriceListImportEngine {
                     listPrice = price,
                     discountPercent = discount,
                     suggestedItemId = top!!.first.id,
-                    suggestedItemName = top.first.name,
+                    suggestedItemName = top.first.marketName.ifBlank { top.first.name },
                     matchKind = ImportMatchKind.SUGGESTED,
                     confidence = top.second,
                 )
@@ -148,7 +160,7 @@ object PriceListImportEngine {
         listPrice = price,
         discountPercent = discount,
         matchedItemId = item.id,
-        matchedItemName = item.name,
+        matchedItemName = item.marketName.ifBlank { item.name },
         matchKind = kind,
         confidence = confidence,
     )
