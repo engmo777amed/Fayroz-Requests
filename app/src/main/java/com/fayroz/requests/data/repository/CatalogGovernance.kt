@@ -125,9 +125,22 @@ object CatalogGovernance {
 
         put("تيب كهرباء", ItemOverride(category = "كهرباء - تأسيس", unit = "لفة", marketName = "شريط عزل كهرباء"))
         put("Junction Box", ItemOverride(category = "كهرباء - تأسيس", unit = "عدد", marketName = "علبة بواط"))
+        listOf("علبة ماجيك مفرد","علبة ماجيك مزدوج","علبة ماجيك ثلاثي","علبة سحب 10×10","علبة سحب 15×15","علبة سحب 20×20","علبة سقف").forEach {
+            put(it, ItemOverride(category = "كهرباء - تأسيس", unit = "عدد"))
+        }
         listOf("10","20","30","40").forEach { s ->
             put("Cable Tie $s سم", ItemOverride(category = "كهرباء - تأسيس", unit = "علبة", marketName = "أفيز كابلات $s سم"))
         }
+
+        // سيراميك/جبس
+        put("موزايكو", ItemOverride(category = "سيراميك وبورسلين", unit = "م²"))
+        listOf("مسمار جبس 25 مم","مسمار جبس 35 مم","مسمار جبس 50 مم").forEach {
+            put(it, ItemOverride(category = "جبس بورد وأسقف", unit = "علبة"))
+        }
+        put("شريط فواصل ورق", ItemOverride(category = "جبس بورد وأسقف", unit = "لفة"))
+        put("شريط فواصل فيبر", ItemOverride(category = "جبس بورد وأسقف", unit = "لفة"))
+        put("معجون فواصل", ItemOverride(category = "جبس بورد وأسقف", unit = "شيكارة"))
+        put("جراوت إيبوكسي فواصل", ItemOverride(category = "مواد لاصقة وكيماويات", unit = "عبوة"))
 
         // نجارة وألوميتال
         put("Laminate HPL", ItemOverride(category = "نجارة وأبواب", unit = "م²"))
@@ -165,6 +178,12 @@ object CatalogGovernance {
         put("إلكترود لحام 3.2 مم", ItemOverride(category = "حديد خفيف وإكسسوارات", unit = "علبة"))
         put("Chemical Anchor", ItemOverride(category = "مواد لاصقة وكيماويات", unit = "عبوة", marketName = "كيميكال أنكر"))
         put("وزرة مطبخ", ItemOverride(category = "مطابخ", unit = "م"))
+        listOf("ضلفة مطبخ MDF","ضلفة مطبخ Acrylic","ضلفة مطبخ HPL").forEach {
+            put(it, ItemOverride(category = "مطابخ", unit = "م²"))
+        }
+        listOf("ضلفة دولاب MDF","ضلفة دولاب زجاج","مراية دولاب").forEach {
+            put(it, ItemOverride(category = "دواليب ودريسينج", unit = "م²"))
+        }
         put("تنر", ItemOverride(category = "دهانات", unit = "لتر"))
 
         // أدوات وليست مستهلكات
