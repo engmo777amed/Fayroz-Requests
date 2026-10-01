@@ -463,7 +463,7 @@ fun PricingCopyEditorScreen(
                 copyId = copyId,
                 requestLineId = requestLineId,
                 brand = latest.brand,
-                unitPrice = latest.priceText.toDoubleOrNull(),
+                unitPrice = latest.parsePricingPrice(priceText),
             )
             pendingLineSaves.remove(requestLineId)
             if (pendingLineSaves.isEmpty()) saveState = "تم الحفظ تلقائيًا ✓"
@@ -478,7 +478,7 @@ fun PricingCopyEditorScreen(
                 copyId = copyId,
                 requestLineId = latest.detail.requestLineId,
                 brand = latest.brand,
-                unitPrice = latest.priceText.toDoubleOrNull(),
+                unitPrice = latest.parsePricingPrice(priceText),
             )
         }
         saveState = "تم الحفظ تلقائيًا ✓"
@@ -545,9 +545,9 @@ fun PricingCopyEditorScreen(
     }
 
     val total = lines.sumOf { line ->
-        (line.priceText.toDoubleOrNull() ?: 0.0) * line.detail.quantity
+        (line.parsePricingPrice(priceText) ?: 0.0) * line.detail.quantity
     }
-    val pricedCount = lines.count { it.priceText.toDoubleOrNull() != null }
+    val pricedCount = lines.count { it.parsePricingPrice(priceText) != null }
     val complete = lines.isNotEmpty() && pricedCount == lines.size
     val linkedSupplier = suppliers.firstOrNull { it.id == data.copy.supplierId }
 
@@ -759,7 +759,7 @@ private fun PricingCopyLineCard(
                         color = MaterialTheme.colorScheme.primary,
                     )
                 }
-                val lineTotal = (line.priceText.toDoubleOrNull() ?: 0.0) * line.detail.quantity
+                val lineTotal = (line.parsePricingPrice(priceText) ?: 0.0) * line.detail.quantity
                 if (line.priceText.isNotBlank()) {
                     Text(
                         money(lineTotal),
@@ -1243,6 +1243,11 @@ private fun money(value: Double): String = "${pricingMoneyFormat.format(value)} 
 
 private fun formatQuantity(value: Double): String =
     if (value % 1.0 == 0.0) value.toInt().toString() else pricingMoneyFormat.format(value)
+
+private fun parsePricingPrice(value: String): Double? {
+    val cleaned = value.trim().trimEnd('.')
+    return if (cleaned.isBlank()) null else cleaned.toDoubleOrNull()
+}
 
 private fun formatPlainNumber(value: Double): String =
     if (value % 1.0 == 0.0) value.toLong().toString() else value.toString()
