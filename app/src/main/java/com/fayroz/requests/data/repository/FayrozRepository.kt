@@ -54,7 +54,15 @@ class FayrozRepository(private val database: FayrozDatabase) {
     )
 
     suspend fun updateProject(project: ProjectEntity) = dao.updateProject(project)
-    suspend fun deleteProject(project: ProjectEntity) = dao.deleteProject(project)
+
+    suspend fun deleteProject(project: ProjectEntity) = database.withTransaction {
+        dao.getSheetsForProject(project.id).forEach { sheet ->
+            dao.getPricingCopies(sheet.id).forEach { copy ->
+                dao.deletePricesBySourceReferencePrefix("pricing-copy:${copy.id}:")
+            }
+        }
+        dao.deleteProject(project)
+    }
 
     suspend fun hasAnyItems(): Boolean = dao.countItems() > 0
 
@@ -487,6 +495,7 @@ class FayrozRepository(private val database: FayrozDatabase) {
         val existing = dao.getPriceBySourceReference(sourceReference)
         val supplierId = copy.supplierId?.takeIf { dao.getSupplier(it) != null }
         val requestLine = dao.getRequestLine(requestLineId)
+        val copyLine = dao.getPricingCopyLine(copy.id, requestLineId)
         if (supplierId == null || requestLine == null || unitPrice == null) {
             existing?.let { dao.deletePrice(it) }
             return
@@ -508,6 +517,8 @@ class FayrozRepository(private val database: FayrozDatabase) {
                     priceDate = copy.quoteDate,
                     source = PriceSource.DIRECT_QUOTE,
                     sourceReference = sourceReference,
+                    brand = copyLine?.brand.orEmpty(),
+                    priceUnit = requestLine.unit,
                     notes = note,
                 )
             )
@@ -521,6 +532,8 @@ class FayrozRepository(private val database: FayrozDatabase) {
                     netPrice = value,
                     priceDate = copy.quoteDate,
                     source = PriceSource.DIRECT_QUOTE,
+                    brand = copyLine?.brand.orEmpty(),
+                    priceUnit = requestLine.unit,
                     notes = note,
                 )
             )
@@ -595,6 +608,8 @@ class FayrozRepository(private val database: FayrozDatabase) {
         listPrice: Double,
         discountPercent: Double? = null,
         rememberAsItemDiscount: Boolean = false,
+        brand: String = "",
+        priceUnit: String = "",
         notes: String = "",
     ): Long = database.withTransaction {
         val priceList = dao.getPriceList(priceListId) ?: error("قائمة الأسعار غير موجودة")
@@ -635,6 +650,8 @@ class FayrozRepository(private val database: FayrozDatabase) {
                     netPrice = netPrice,
                     priceDate = priceList.effectiveDate,
                     source = PriceSource.PRICE_LIST,
+                    brand = brand.trim(),
+                    priceUnit = priceUnit.trim().ifBlank { item.defaultUnit },
                     notes = notes.trim(),
                 )
             )
@@ -645,6 +662,8 @@ class FayrozRepository(private val database: FayrozDatabase) {
                     appliedDiscountPercent = appliedDiscount,
                     netPrice = netPrice,
                     priceDate = priceList.effectiveDate,
+                    brand = brand.trim(),
+                    priceUnit = priceUnit.trim().ifBlank { item.defaultUnit },
                     notes = notes.trim(),
                 )
             )
@@ -662,6 +681,8 @@ class FayrozRepository(private val database: FayrozDatabase) {
         quotedPrice: Double,
         discountPercent: Double? = null,
         rememberAsItemDiscount: Boolean = false,
+        brand: String = "",
+        priceUnit: String = "",
         notes: String = "",
     ): Long = database.withTransaction {
         val supplier = dao.getSupplier(supplierId) ?: error("المورد غير موجود")
@@ -697,6 +718,8 @@ class FayrozRepository(private val database: FayrozDatabase) {
                 netPrice = PricingEngine.netPrice(safePrice, appliedDiscount),
                 priceDate = System.currentTimeMillis(),
                 source = PriceSource.DIRECT_QUOTE,
+                brand = brand.trim(),
+                priceUnit = priceUnit.trim().ifBlank { item.defaultUnit },
                 notes = notes.trim(),
             )
         )
@@ -715,7 +738,16 @@ class FayrozRepository(private val database: FayrozDatabase) {
         val pricesByItem = latestPrices.groupBy { it.itemId }
 
         val lineComparisons = lines.map { line ->
-            val offers = pricesByItem[line.itemId].orEmpty().mapNotNull { price ->
+            val latestMatchingUnit = pricesByItem[line.itemId].orEmpty()
+                .filter { samePriceUnit(it.priceUnit, line.unit) }
+                .groupBy { it.supplierId }
+                .mapNotNull { (_, supplierPrices) ->
+                    supplierPrices.maxWithOrNull(
+                        compareBy<SupplierPriceEntity> { it.priceDate }.thenBy { it.id }
+                    )
+                }
+
+            val offers = latestMatchingUnit.mapNotNull { price ->
                 val supplier = suppliers[price.supplierId] ?: return@mapNotNull null
                 PricingOffer(
                     supplierPriceId = price.id,
@@ -729,6 +761,8 @@ class FayrozRepository(private val database: FayrozDatabase) {
                     totalNet = price.netPrice * line.quantity,
                     priceDate = price.priceDate,
                     source = price.source,
+                    brand = price.brand,
+                    priceUnit = price.priceUnit,
                 )
             }.sortedBy { it.netUnitPrice }
 
@@ -786,7 +820,15 @@ class FayrozRepository(private val database: FayrozDatabase) {
             dao.updatePriceList(priceList.copy(sourceReference = sourceReference.trim()))
         }
         val existingItems = dao.getItems().toMutableList()
-        val byNormalizedName = existingItems.associateBy { ImportText.normalizeItemName(it.name) }.toMutableMap()
+        val byNormalizedName = existingItems
+            .flatMap { item ->
+                buildList {
+                    add(ImportText.normalizeItemName(item.name) to item)
+                    if (item.marketName.isNotBlank()) add(ImportText.normalizeItemName(item.marketName) to item)
+                }
+            }
+            .toMap()
+            .toMutableMap()
         val byNormalizedCode = existingItems.filter { it.code.isNotBlank() }
             .associateBy { ImportText.normalizeCode(it.code) }
             .toMutableMap()
@@ -813,10 +855,14 @@ class FayrozRepository(private val database: FayrozDatabase) {
                     } else {
                         generateItemCode()
                     }
+                    val fallbackCategoryId = dao.findCategoryByName("أخرى")?.id
+                        ?: dao.insertCategory(CategoryEntity(name = "أخرى"))
                     val newItem = ItemEntity(
                         code = safeCode,
                         name = row.itemName.trim(),
+                        marketName = row.itemName.trim(),
                         normalizedName = normalizedName,
+                        categoryId = fallbackCategoryId,
                         defaultUnit = row.unit.trim().ifBlank { "وحدة" },
                         brand = row.brand.trim(),
                         specification = row.specification.trim(),
@@ -853,6 +899,8 @@ class FayrozRepository(private val database: FayrozDatabase) {
                         netPrice = netPrice,
                         priceDate = priceList.effectiveDate,
                         source = PriceSource.PRICE_LIST,
+                        brand = row.brand.trim(),
+                        priceUnit = row.unit.trim().ifBlank { resolvedItem.defaultUnit },
                         notes = "مستورد من القائمة",
                     )
                 )
@@ -865,6 +913,8 @@ class FayrozRepository(private val database: FayrozDatabase) {
                         netPrice = netPrice,
                         priceDate = priceList.effectiveDate,
                         source = PriceSource.PRICE_LIST,
+                        brand = row.brand.trim(),
+                        priceUnit = row.unit.trim().ifBlank { resolvedItem.defaultUnit },
                         notes = "تم تحديثه من الاستيراد",
                     )
                 )
@@ -1098,6 +1148,23 @@ class FayrozRepository(private val database: FayrozDatabase) {
             )
         )
     }
+
+    private fun samePriceUnit(a: String, b: String): Boolean =
+        normalizePriceUnit(a) == normalizePriceUnit(b)
+
+    private fun normalizePriceUnit(value: String): String = value
+        .trim()
+        .lowercase(Locale.ROOT)
+        .replace("م.ط", "م")
+        .replace("م ط", "م")
+        .replace("متر طولي", "م")
+        .replace("متر", "م")
+        .replace("لفه", "لفة")
+        .replace("وحده", "وحدة")
+        .replace("م٢", "م²")
+        .replace("م2", "م²")
+        .replace("م٣", "م³")
+        .replace("م3", "م³")
 
     private fun generateItemCode(): String = "ITM-${UUID.randomUUID().toString().take(8).uppercase(Locale.ROOT)}"
 }
