@@ -97,7 +97,6 @@ object BrandCatalog {
             "Siemens",
         ),
         "كهرباء - تأسيس" to listOf(
-            "Elsewedy Electric",
             "Elsewedy Cables",
             "Kabelmetal",
             "El Nasr Cables",
@@ -122,11 +121,11 @@ object BrandCatalog {
         ),
         "إضاءة" to listOf(
             "Philips / Signify",
-            "Osram / LEDVANCE",
+            "LEDVANCE",
             "Opple",
             "V-TAC",
             "EGLO",
-            "Ledvance",
+            "Panasonic",
         ),
         "تيار خفيف وسمارت" to listOf(
             "Hikvision",
@@ -176,8 +175,6 @@ object BrandCatalog {
             "Marmarica",
             "Hashma",
             "Stone Egypt",
-            "Imported",
-            "Local",
         ),
         "جبس بورد وأسقف" to listOf(
             "Knauf Egypt",
@@ -216,8 +213,6 @@ object BrandCatalog {
             "Guardian Glass",
             "Sphinx Glass",
             "Dr Greiche",
-            "Imported",
-            "Local",
         ),
         "مطابخ" to listOf(
             "Hettich",
@@ -248,8 +243,6 @@ object BrandCatalog {
             "Beshay Steel",
             "Egyptian Steel",
             "Suez Steel",
-            "Local",
-            "Imported",
         ),
         "واجهات تشطيب" to listOf(
             "Alucobond",
@@ -260,8 +253,6 @@ object BrandCatalog {
             "Sika",
         ),
         "أعمال خارجية" to listOf(
-            "Local",
-            "Imported",
             "CEMEX",
             "Sika",
             "Mapei",
@@ -283,7 +274,7 @@ object BrandCatalog {
             "Bostik",
             "Henkel / Pattex",
         ),
-        "مستهلكات موقع" to listOf(
+        "عدد وأدوات" to listOf(
             "Bosch Professional",
             "Makita",
             "Stanley",
@@ -291,6 +282,13 @@ object BrandCatalog {
             "Total Tools",
             "Ingco",
         ),
-        "أخرى" to listOf("Local", "Imported", "OEM", "Generic"),
+        "مستهلكات موقع" to listOf(
+            "3M",
+            "Tesa",
+            "Stanley",
+            "Total Tools",
+            "Ingco",
+        ),
+        "أخرى" to emptyList(),
     )
 }
