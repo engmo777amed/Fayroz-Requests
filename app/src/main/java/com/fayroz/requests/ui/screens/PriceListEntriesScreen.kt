@@ -172,6 +172,7 @@ private fun PriceEntryDialog(
     LaunchedEffect(selectedItem?.id, initialEntry?.priceId) {
         val item = selectedItem ?: return@LaunchedEffect
         if (initialEntry == null) {
+            if (priceUnit.isBlank()) priceUnit = item.defaultUnit
             discount = repository.suggestedDiscountPercent(
                 supplierId = repository.getPriceList(priceListId)?.supplierId ?: return@LaunchedEffect,
                 itemId = item.id,
