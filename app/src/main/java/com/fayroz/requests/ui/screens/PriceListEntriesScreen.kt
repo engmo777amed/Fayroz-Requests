@@ -67,7 +67,14 @@ fun PriceListEntriesScreen(
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Column(Modifier.weight(1f)) {
                                     Text(entry.itemName, style = MaterialTheme.typography.titleMedium)
-                                    Text("${entry.itemCode} • ${entry.unit}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(
+                                        buildString {
+                                            append(entry.itemCode).append(" • ").append(entry.unit)
+                                            if (entry.brand.isNotBlank()) append(" • ").append(entry.brand)
+                                        },
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
                                 }
                                 Row {
                                     IconButton(onClick = { editing = entry }) { Icon(Icons.Outlined.Edit, "تعديل") }
@@ -146,6 +153,8 @@ private fun PriceEntryDialog(
     var selectedItem by remember(initialEntry?.priceId) { mutableStateOf<ItemEntity?>(null) }
     var listPrice by remember(initialEntry) { mutableStateOf(initialEntry?.listPrice?.toString() ?: "") }
     var discount by remember(initialEntry) { mutableStateOf(initialEntry?.appliedDiscountPercent?.toString() ?: "") }
+    var brand by remember(initialEntry) { mutableStateOf(initialEntry?.brand ?: "") }
+    var priceUnit by remember(initialEntry) { mutableStateOf(initialEntry?.unit ?: "") }
     var rememberDiscount by remember { mutableStateOf(false) }
     var notes by remember(initialEntry) { mutableStateOf(initialEntry?.notes ?: "") }
     var showItemPicker by remember { mutableStateOf(false) }
@@ -154,6 +163,9 @@ private fun PriceEntryDialog(
     LaunchedEffect(initialEntry?.itemId, allItems.size) {
         if (initialEntry != null && selectedItem == null) {
             selectedItem = allItems.firstOrNull { it.id == initialEntry.itemId }
+        }
+        if (priceUnit.isBlank()) {
+            selectedItem?.let { priceUnit = it.defaultUnit }
         }
     }
 
@@ -184,6 +196,22 @@ private fun PriceEntryDialog(
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 )
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = brand,
+                        onValueChange = { brand = it },
+                        modifier = Modifier.weight(1f),
+                        label = { Text("الماركة") },
+                        singleLine = true,
+                    )
+                    OutlinedTextField(
+                        value = priceUnit,
+                        onValueChange = { priceUnit = it },
+                        modifier = Modifier.weight(0.72f),
+                        label = { Text("وحدة السعر") },
+                        singleLine = true,
+                    )
+                }
                 OutlinedTextField(
                     value = discount,
                     onValueChange = { discount = it },
@@ -217,13 +245,19 @@ private fun PriceEntryDialog(
                             listPrice = listPrice.toDoubleOrNull() ?: 0.0,
                             discountPercent = discount.toDoubleOrNull(),
                             rememberAsItemDiscount = rememberDiscount,
+                            brand = brand,
+                            priceUnit = priceUnit.ifBlank { item.defaultUnit },
                             notes = notes,
                         )
                         saving = false
                         onSaved()
                     }
                 },
-                enabled = selectedItem != null && (listPrice.toDoubleOrNull() ?: -1.0) >= 0.0 && (discount.toDoubleOrNull() ?: -1.0) in 0.0..100.0 && !saving,
+                enabled = selectedItem != null &&
+                    priceUnit.isNotBlank() &&
+                    (listPrice.toDoubleOrNull() ?: -1.0) >= 0.0 &&
+                    (discount.toDoubleOrNull() ?: -1.0) in 0.0..100.0 &&
+                    !saving,
             ) { Text(if (saving) "جارٍ الحفظ" else "حفظ") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } },
@@ -249,7 +283,11 @@ private fun ItemPickerDialog(
 ) {
     var query by remember { mutableStateOf("") }
     val filtered = remember(items, query) {
-        if (query.isBlank()) items else items.filter { it.name.contains(query, true) || it.code.contains(query, true) }
+        if (query.isBlank()) items else items.filter {
+            it.name.contains(query, true) ||
+                it.marketName.contains(query, true) ||
+                it.code.contains(query, true)
+        }
     }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -267,8 +305,11 @@ private fun ItemPickerDialog(
                 LazyColumn(Modifier.heightIn(max = 380.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     items(filtered, key = { it.id }) { item ->
                         ListItem(
-                            headlineContent = { Text(item.name) },
-                            supportingContent = { Text("${item.code} • ${item.defaultUnit}") },
+                            headlineContent = { Text(item.marketName.ifBlank { item.name }) },
+                            supportingContent = {
+                                val technical = if (item.marketName.isNotBlank() && item.marketName != item.name) " • ${item.name}" else ""
+                                Text("${item.code} • ${item.defaultUnit}$technical")
+                            },
                             modifier = Modifier.clickable { onSelect(item) },
                         )
                     }
