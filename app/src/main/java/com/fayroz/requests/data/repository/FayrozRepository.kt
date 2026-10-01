@@ -22,10 +22,11 @@ class FayrozRepository(private val database: FayrozDatabase) {
     val sheetSummaries: Flow<List<RequestSheetSummary>> = dao.observeSheetSummaries()
     val suppliers: Flow<List<SupplierEntity>> = dao.observeSuppliers()
 
-    fun writeBackup(output: java.io.OutputStream) = DatabaseBackup.write(database, output)
+    fun writeBackup(context: android.content.Context, output: java.io.OutputStream) =
+        DatabaseBackup.write(context, database, output)
 
-    suspend fun restoreBackup(input: java.io.InputStream) {
-        DatabaseBackup.restore(database, input)
+    suspend fun restoreBackup(context: android.content.Context, input: java.io.InputStream) {
+        DatabaseBackup.restore(context, database, input)
         // أي Backup قديم يرجع عبر نفس بوابة الـMaster Catalog الجديدة.
         ensureStarterCatalog()
         ensureStarterBrands()
