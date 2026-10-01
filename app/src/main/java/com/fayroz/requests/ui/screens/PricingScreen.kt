@@ -463,7 +463,7 @@ fun PricingCopyEditorScreen(
                 copyId = copyId,
                 requestLineId = requestLineId,
                 brand = latest.brand,
-                unitPrice = latest.parsePricingPrice(priceText),
+                unitPrice = parsePricingPrice(latest.priceText),
             )
             pendingLineSaves.remove(requestLineId)
             if (pendingLineSaves.isEmpty()) saveState = "تم الحفظ تلقائيًا ✓"
@@ -478,7 +478,7 @@ fun PricingCopyEditorScreen(
                 copyId = copyId,
                 requestLineId = latest.detail.requestLineId,
                 brand = latest.brand,
-                unitPrice = latest.parsePricingPrice(priceText),
+                unitPrice = parsePricingPrice(latest.priceText),
             )
         }
         saveState = "تم الحفظ تلقائيًا ✓"
@@ -545,9 +545,9 @@ fun PricingCopyEditorScreen(
     }
 
     val total = lines.sumOf { line ->
-        (line.parsePricingPrice(priceText) ?: 0.0) * line.detail.quantity
+        (parsePricingPrice(line.priceText) ?: 0.0) * line.detail.quantity
     }
-    val pricedCount = lines.count { it.parsePricingPrice(priceText) != null }
+    val pricedCount = lines.count { parsePricingPrice(it.priceText) != null }
     val complete = lines.isNotEmpty() && pricedCount == lines.size
     val linkedSupplier = suppliers.firstOrNull { it.id == data.copy.supplierId }
 
@@ -759,7 +759,7 @@ private fun PricingCopyLineCard(
                         color = MaterialTheme.colorScheme.primary,
                     )
                 }
-                val lineTotal = (line.parsePricingPrice(priceText) ?: 0.0) * line.detail.quantity
+                val lineTotal = (parsePricingPrice(line.priceText) ?: 0.0) * line.detail.quantity
                 if (line.priceText.isNotBlank()) {
                     Text(
                         money(lineTotal),
