@@ -104,6 +104,81 @@ class FayrozRepository(private val database: FayrozDatabase) {
         }
     }
 
+    suspend fun ensureCatalogGovernance() = database.withTransaction {
+        val categoriesByName = dao.getCategories().associateBy { it.name }
+
+        // 1) ترتيب الكاتجوري الرسمي. أي كاتجوري أضافها المستخدم تظل موجودة بعد القائمة الأساسية.
+        StarterCatalog.categories.forEachIndexed { index, name ->
+            categoriesByName[name]?.let { category ->
+                if (category.sortOrder != index) {
+                    dao.updateCategory(category.copy(sortOrder = index))
+                }
+            }
+        }
+
+        // 2) نقل الأصناف من الكاتجوري القديمة المخفية بدل تركها غير ظاهرة.
+        StarterCatalog.hiddenCategories.forEach { legacyName ->
+            val legacy = dao.findCategoryByName(legacyName) ?: return@forEach
+            dao.getItemsByCategoryIncludingInactive(legacy.id).forEach itemLoop@ { item ->
+                val targetName = CatalogGovernance.targetForLegacyCategory(legacyName, item.name)
+                    ?: return@itemLoop
+                val target = dao.findCategoryByName(targetName) ?: return@itemLoop
+                if (item.categoryId != target.id) {
+                    dao.updateItem(item.copy(categoryId = target.id))
+                }
+            }
+        }
+
+        // 3) تصحيح Master category / unit / market label للأصناف المعروفة.
+        CatalogGovernance.exactOverrides.forEach { (technicalName, override) ->
+            val normalized = ImportText.normalizeItemName(technicalName)
+            val item = dao.findItemByNormalizedName(normalized) ?: return@forEach
+            val categoryId = override.category
+                ?.let { dao.findCategoryByName(it)?.id }
+                ?: item.categoryId
+            dao.updateItem(
+                item.copy(
+                    categoryId = categoryId,
+                    defaultUnit = override.unit ?: item.defaultUnit,
+                    marketName = override.marketName ?: item.marketName,
+                    specification = override.specification ?: item.specification,
+                )
+            )
+        }
+
+        // 4) دمج الأسماء القديمة في Master item مع الحفاظ على كل العلاقات والتاريخ.
+        CatalogGovernance.mergeAliases.forEach { (oldName, masterName) ->
+            val oldItem = dao.findItemByNormalizedName(ImportText.normalizeItemName(oldName))
+                ?: return@forEach
+            val masterItem = dao.findItemByNormalizedName(ImportText.normalizeItemName(masterName))
+                ?: return@forEach
+            if (oldItem.id == masterItem.id) return@forEach
+
+            dao.relinkRequestLines(oldItem.id, masterItem.id)
+            dao.relinkSupplierPrices(oldItem.id, masterItem.id)
+            dao.relinkItemDiscountRules(oldItem.id, masterItem.id)
+            dao.deleteItem(oldItem)
+        }
+
+        // 5) الأصناف القديمة المبهمة تظل في التاريخ لكن لا تظهر في الشراء الجديد.
+        CatalogGovernance.archiveNames.forEach { name ->
+            dao.findItemByNormalizedName(ImportText.normalizeItemName(name))?.let { item ->
+                dao.archiveItem(item.id)
+            }
+        }
+
+        // 6) كلمات المنشأ/الوصف ليست ماركات.
+        dao.deleteCategoryBrandsByNames(CatalogGovernance.nonBrandNames.toList())
+
+        // إزالة ازدواج أسماء شركات معروف بعد توحيد BrandCatalog.
+        dao.findCategoryByName("إضاءة")?.let {
+            dao.deleteCategoryBrandByName(it.id, "Ledvance")
+        }
+        dao.findCategoryByName("كهرباء - تأسيس")?.let {
+            dao.deleteCategoryBrandByName(it.id, "Elsewedy Electric")
+        }
+    }
+
     suspend fun ensureStarterBrands() = database.withTransaction {
         val catalogCategories = (StarterCatalog.categories + MarketCatalogExpansion.categories).distinct()
         catalogCategories.forEach { categoryName ->
