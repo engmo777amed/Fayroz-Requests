@@ -103,6 +103,24 @@ object CatalogGovernance {
         put("خرطوم تنقيط 16 مم", ItemOverride(category = "شبكات مياه وري", unit = "م"))
 
         // كهرباء
+        // المقاطع الصغيرة تُشترى غالبًا كلفة، والمقاطع الكبيرة بالمتر/الطبل.
+        listOf("1.5","2","2.5","3","4","6","10","16","25","35","50","70","95","120","150","185","240","300","400","500","630").forEach { s ->
+            put(
+                "H07V-R 450/750V 1×$s مم²",
+                ItemOverride(category = "كهرباء - تأسيس", unit = if ((s.toDoubleOrNull() ?: 0.0) <= 10.0) "لفة" else "م"),
+            )
+        }
+        listOf("1.5","2","2.5","3","4","6","10","16","25","35","50","70","95","120","150","185","240","300").forEach { s ->
+            put(
+                "H07V-K 450/750V 1×$s مم²",
+                ItemOverride(category = "كهرباء - تأسيس", unit = if ((s.toDoubleOrNull() ?: 0.0) <= 10.0) "لفة" else "م"),
+            )
+            put(
+                "PE H07V-K 450/750V 1×$s مم² أخضر/أصفر",
+                ItemOverride(category = "كهرباء - تأسيس", unit = if ((s.toDoubleOrNull() ?: 0.0) <= 10.0) "لفة" else "م"),
+            )
+        }
+
         put("تيب كهرباء", ItemOverride(category = "كهرباء - تأسيس", unit = "لفة", marketName = "شريط عزل كهرباء"))
         put("Junction Box", ItemOverride(category = "كهرباء - تأسيس", unit = "عدد", marketName = "علبة بواط"))
         listOf("10","20","30","40").forEach { s ->
@@ -115,6 +133,7 @@ object CatalogGovernance {
         put("سلك ناموس فيبر", ItemOverride(category = "ألوميتال وUPVC", unit = "م²"))
         put("سلك ناموس ألومنيوم", ItemOverride(category = "ألوميتال وUPVC", unit = "م²"))
         put("سيليكون ألوميتال", ItemOverride(category = "مواد لاصقة وكيماويات", unit = "عبوة"))
+        put("سيليكون زجاج", ItemOverride(category = "مواد لاصقة وكيماويات", unit = "عبوة"))
 
         // شتر
         put("دليل شتر جانبي", ItemOverride(category = "شتر", unit = "م"))
@@ -126,11 +145,25 @@ object CatalogGovernance {
         put("إكسسوارات تثبيت واجهات", ItemOverride(category = "واجهات تشطيب", unit = "عدد"))
         put("Anchor واجهات", ItemOverride(category = "مثبتات وإكسسوارات", unit = "عدد"))
         put("براغي ستانلس واجهات", ItemOverride(category = "مثبتات وإكسسوارات", unit = "علبة"))
+        put("بروفايل واجهات", ItemOverride(category = "واجهات تشطيب", unit = "م"))
+
+        // أعمال خارجية
+        put("زلط ديكوري أبيض", ItemOverride(category = "أعمال خارجية", unit = "م³"))
+        put("زلط ديكوري رمادي", ItemOverride(category = "أعمال خارجية", unit = "م³"))
+        put("تربة زراعية", ItemOverride(category = "أعمال خارجية", unit = "م³"))
+
+        // تكييف
+        put("Duct صاج مجلفن", ItemOverride(category = "تكييف وتهوية", unit = "م²", marketName = "دكت صاج مجلفن"))
+        put("فريون R410A", ItemOverride(category = "تكييف وتهوية", unit = "اسطوانة"))
+        put("فريون R32", ItemOverride(category = "تكييف وتهوية", unit = "اسطوانة"))
 
         // حديد خفيف
         put("دهان مقاوم صدأ", ItemOverride(category = "دهانات", unit = "جردل"))
         put("إلكترود لحام 2.5 مم", ItemOverride(category = "حديد خفيف وإكسسوارات", unit = "علبة"))
         put("إلكترود لحام 3.2 مم", ItemOverride(category = "حديد خفيف وإكسسوارات", unit = "علبة"))
+        put("Chemical Anchor", ItemOverride(category = "مواد لاصقة وكيماويات", unit = "عبوة", marketName = "كيميكال أنكر"))
+        put("وزرة مطبخ", ItemOverride(category = "مطابخ", unit = "م"))
+        put("تنر", ItemOverride(category = "دهانات", unit = "لتر"))
 
         // أدوات وليست مستهلكات
         listOf("متر 5 م","متر 8 م","ميزان مياه 60 سم","ميزان مياه 100 سم").forEach {
@@ -269,7 +302,13 @@ object CatalogGovernance {
                 else -> 90
             }
             "كهرباء - تأسيس" -> when {
-                text.contains("H05V", true) || text.contains("H07V", true) || text.contains("سلك نحاس") || text.contains("سلك أرضي") -> 10
+                text.contains("H05V-R", true) -> 10
+                text.contains("H05V-K", true) -> 11
+                text.contains("H07V-U", true) -> 12
+                text.contains("H07V-R", true) && !text.contains("PE ", true) -> 13
+                text.contains("H07V-K", true) && !text.contains("PE ", true) -> 14
+                text.contains("PE H07V-K", true) || text.contains("سلك أرضي") -> 15
+                text.contains("سلك نحاس") -> 16
                 text.contains("كابل نحاس") -> 20
                 text.contains("ماسورة PVC", true) || text.contains("خرطوم كهرب") -> 30
                 text.contains("كوع ماسورة") || text.contains("جلبة ماسورة") || text.contains("كلبسة ماسورة") -> 40
