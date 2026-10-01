@@ -1073,7 +1073,7 @@ fun PricingCopiesComparisonScreen(
 
             item { Text("إجمالي النسخ", style = MaterialTheme.typography.titleMedium) }
 
-            items(comparison.copies, key = { it.copy.id }) { copy ->
+            items(comparison.copies, key = { "copy_${it.copy.id}" }) { copy ->
                 val isLowestComplete = copy.complete &&
                     comparison.lowestCompleteTotal != null &&
                     copy.total == comparison.lowestCompleteTotal
@@ -1126,7 +1126,7 @@ fun PricingCopiesComparisonScreen(
                 Text("مقارنة البنود", style = MaterialTheme.typography.titleMedium)
             }
 
-            items(baseLines, key = { it.requestLineId }) { baseLine ->
+            items(baseLines, key = { "line_${it.requestLineId}" }) { baseLine ->
                 val offers = comparison.copies.mapNotNull { copy ->
                     copy.lines.firstOrNull { it.requestLineId == baseLine.requestLineId }?.let { line ->
                         Triple(copy, line, line.unitPrice)
