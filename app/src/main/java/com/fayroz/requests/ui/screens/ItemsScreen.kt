@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.fayroz.requests.data.model.CategoryEntity
 import com.fayroz.requests.data.model.ItemEntity
+import com.fayroz.requests.data.repository.CatalogGovernance
 import com.fayroz.requests.data.repository.FayrozRepository
 import com.fayroz.requests.data.repository.StarterCatalog
 import kotlinx.coroutines.launch
@@ -41,18 +42,21 @@ fun ItemsScreen(repository: FayrozRepository, onOpenHistory: (Long) -> Unit = {}
     val categoryOrderById = remember(visibleCategories) {
         visibleCategories.mapIndexed { index, category -> category.id to index }.toMap()
     }
-    val visibleItems = remember(allItems, visibleCategoryIds, categoryOrderById) {
+    val categoryById = remember(visibleCategories) { visibleCategories.associateBy { it.id } }
+    val visibleItems = remember(allItems, visibleCategoryIds, categoryOrderById, categoryById) {
         allItems
             .filter { it.categoryId == null || it.categoryId in visibleCategoryIds }
-            .sortedWith(
-                compareBy<ItemEntity> { categoryOrderById[it.categoryId] ?: Int.MAX_VALUE }
-                    .thenBy { StarterCatalog.itemFamilyRank(it.name) }
-                    .thenBy { StarterCatalog.firstMarketNumber(it.name) }
-                    .thenBy { it.marketName.ifBlank { StarterCatalog.marketName(it.name) } }
-                    .thenBy { it.name }
-            )
+            .sortedWith { a, b ->
+                val aCategoryOrder = categoryOrderById[a.categoryId] ?: Int.MAX_VALUE
+                val bCategoryOrder = categoryOrderById[b.categoryId] ?: Int.MAX_VALUE
+                if (aCategoryOrder != bCategoryOrder) {
+                    aCategoryOrder.compareTo(bCategoryOrder)
+                } else {
+                    val categoryName = a.categoryId?.let { categoryById[it]?.name }.orEmpty()
+                    CatalogGovernance.comparator(categoryName).compare(a, b)
+                }
+            }
     }
-    val categoryById = remember(visibleCategories) { visibleCategories.associateBy { it.id } }
     val filtered = remember(visibleItems, query, categoryById, selectedCategoryId) {
         visibleItems.filter { item ->
             val categoryMatches = selectedCategoryId == null || item.categoryId == selectedCategoryId
