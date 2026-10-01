@@ -44,7 +44,7 @@ fun DataToolsScreen(
                 Toast.makeText(
                     context,
                     if (result.isSuccess) "تم إنشاء النسخة الاحتياطية ✓"
-                    else "تعذر إنشاء النسخة الاحتياطية",
+                    else "تعذر إنشاء النسخة: ${result.exceptionOrNull()?.message.orEmpty()}",
                     Toast.LENGTH_LONG,
                 ).show()
             }
