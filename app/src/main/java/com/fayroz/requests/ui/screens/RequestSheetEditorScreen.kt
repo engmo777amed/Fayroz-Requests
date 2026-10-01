@@ -34,6 +34,7 @@ import com.fayroz.requests.data.model.ItemEntity
 import com.fayroz.requests.data.model.ProjectEntity
 import com.fayroz.requests.data.model.RequestLineDraft
 import com.fayroz.requests.data.model.RequestSheetDraft
+import com.fayroz.requests.data.repository.CatalogGovernance
 import com.fayroz.requests.data.repository.FayrozRepository
 import com.fayroz.requests.data.repository.StarterCatalog
 import com.fayroz.requests.export.FayrozReports
@@ -129,19 +130,22 @@ fun RequestSheetEditorScreen(
     }
     val visibleCategoryIds = remember(categories) { categories.map { it.id }.toSet() }
     val categoryOrderById = remember(categories) { categories.mapIndexed { index, category -> category.id to index }.toMap() }
-    val items = remember(allItems, visibleCategoryIds, categoryOrderById) {
+    val categoryById = remember(categories) { categories.associateBy { it.id } }
+    val items = remember(allItems, visibleCategoryIds, categoryOrderById, categoryById) {
         allItems
             .filter { it.categoryId == null || it.categoryId in visibleCategoryIds }
-            .sortedWith(
-                compareBy<ItemEntity> { categoryOrderById[it.categoryId] ?: Int.MAX_VALUE }
-                    .thenBy { StarterCatalog.itemFamilyRank(it.name) }
-                    .thenBy { StarterCatalog.firstMarketNumber(it.name) }
-                    .thenBy { it.marketName.ifBlank { StarterCatalog.marketName(it.name) } }
-                    .thenBy { it.name }
-            )
+            .sortedWith { a, b ->
+                val aCategoryOrder = categoryOrderById[a.categoryId] ?: Int.MAX_VALUE
+                val bCategoryOrder = categoryOrderById[b.categoryId] ?: Int.MAX_VALUE
+                if (aCategoryOrder != bCategoryOrder) {
+                    aCategoryOrder.compareTo(bCategoryOrder)
+                } else {
+                    val categoryName = a.categoryId?.let { categoryById[it]?.name }.orEmpty()
+                    CatalogGovernance.comparator(categoryName).compare(a, b)
+                }
+            }
     }
     val itemById = remember(items) { items.associateBy { it.id } }
-    val categoryById = remember(categories) { categories.associateBy { it.id } }
 
     var selectedProjectId by remember { mutableStateOf<Long?>(null) }
     var sheetNumber by remember { mutableStateOf("") }
