@@ -140,7 +140,8 @@ object DatabaseBackup {
             while (cursor.moveToNext()) {
                 val sheetId = cursor.getLong(idIndex)
                 val reference = cursor.getString(uriIndex).orEmpty()
-                val bytes = readAttachment(context, reference) ?: continue
+                val bytes = readAttachment(context, reference)
+                    ?: error("تعذر قراءة صورة الكشف رقم $sheetId أثناء إنشاء النسخة الاحتياطية.")
                 result.put(
                     JSONObject()
                         .put("sheetId", sheetId)
