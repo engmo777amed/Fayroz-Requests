@@ -150,6 +150,9 @@ interface FayrozDao {
     @Query("SELECT * FROM request_sheets WHERE id = :sheetId LIMIT 1")
     suspend fun getSheet(sheetId: Long): RequestSheetEntity?
 
+    @Query("SELECT * FROM request_sheets WHERE projectId = :projectId ORDER BY id")
+    suspend fun getSheetsForProject(projectId: Long): List<RequestSheetEntity>
+
     @Query("SELECT * FROM request_lines WHERE id = :requestLineId LIMIT 1")
     suspend fun getRequestLine(requestLineId: Long): RequestLineEntity?
 
@@ -251,7 +254,8 @@ interface FayrozDao {
                sp.itemId AS itemId,
                COALESCE(NULLIF(i.marketName, ''), i.name) AS itemName,
                i.code AS itemCode,
-               i.defaultUnit AS unit,
+               COALESCE(NULLIF(sp.priceUnit, ''), i.defaultUnit) AS unit,
+               sp.brand AS brand,
                sp.listPrice AS listPrice,
                sp.appliedDiscountPercent AS appliedDiscountPercent,
                sp.netPrice AS netPrice,
@@ -276,6 +280,8 @@ interface FayrozDao {
                sp.supplierId AS supplierId,
                s.name AS supplierName,
                pl.name AS priceListName,
+               sp.brand AS brand,
+               COALESCE(NULLIF(sp.priceUnit, ''), i.defaultUnit) AS unit,
                sp.listPrice AS listPrice,
                sp.appliedDiscountPercent AS appliedDiscountPercent,
                sp.netPrice AS netPrice,
@@ -284,6 +290,7 @@ interface FayrozDao {
                sp.notes AS notes
         FROM supplier_prices sp
         INNER JOIN suppliers s ON s.id = sp.supplierId
+        INNER JOIN items i ON i.id = sp.itemId
         LEFT JOIN price_lists pl ON pl.id = sp.priceListId
         WHERE sp.itemId = :itemId
         ORDER BY sp.priceDate DESC, sp.id DESC
@@ -301,6 +308,7 @@ interface FayrozDao {
               FROM supplier_prices newer
               WHERE newer.supplierId = sp.supplierId
                 AND newer.itemId = sp.itemId
+                AND COALESCE(NULLIF(newer.priceUnit, ''), '') = COALESCE(NULLIF(sp.priceUnit, ''), '')
                 AND (newer.priceDate > sp.priceDate OR (newer.priceDate = sp.priceDate AND newer.id > sp.id))
           )
         ORDER BY sp.itemId, sp.netPrice
