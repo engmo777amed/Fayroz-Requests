@@ -3,6 +3,7 @@ package com.fayroz.requests.ui.screens
 import android.app.DatePickerDialog
 import android.content.Context
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -23,6 +24,7 @@ import com.fayroz.requests.data.model.*
 import com.fayroz.requests.data.repository.FayrozRepository
 import com.fayroz.requests.export.FayrozReports
 import com.fayroz.requests.export.ShareFiles
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.DecimalFormat
 import java.time.Instant
@@ -448,6 +450,49 @@ fun PricingCopyEditorScreen(
     var brandTargetIndex by remember { mutableStateOf<Int?>(null) }
     var editDetails by remember { mutableStateOf(false) }
     var saveState by remember { mutableStateOf("تم الحفظ تلقائيًا ✓") }
+    val pendingLineSaves = remember { mutableMapOf<Long, kotlinx.coroutines.Job>() }
+
+    fun scheduleLineSave(requestLineId: Long) {
+        pendingLineSaves[requestLineId]?.cancel()
+        saveState = "جارٍ الحفظ..."
+        pendingLineSaves[requestLineId] = scope.launch {
+            delay(300)
+            val latest = lines.firstOrNull { it.detail.requestLineId == requestLineId }
+                ?: return@launch
+            repository.updatePricingCopyLine(
+                copyId = copyId,
+                requestLineId = requestLineId,
+                brand = latest.brand,
+                unitPrice = latest.priceText.toDoubleOrNull(),
+            )
+            pendingLineSaves.remove(requestLineId)
+            if (pendingLineSaves.isEmpty()) saveState = "تم الحفظ تلقائيًا ✓"
+        }
+    }
+
+    suspend fun flushLineSaves() {
+        pendingLineSaves.values.forEach { it.cancel() }
+        pendingLineSaves.clear()
+        lines.forEach { latest ->
+            repository.updatePricingCopyLine(
+                copyId = copyId,
+                requestLineId = latest.detail.requestLineId,
+                brand = latest.brand,
+                unitPrice = latest.priceText.toDoubleOrNull(),
+            )
+        }
+        saveState = "تم الحفظ تلقائيًا ✓"
+    }
+
+    val safeBack: () -> Unit = {
+        scope.launch {
+            saveState = "جارٍ الحفظ..."
+            flushLineSaves()
+            onBack()
+        }
+    }
+
+    BackHandler(onBack = safeBack)
 
     fun applyLoaded(data: PricingCopyDetail?) {
         detail = data
@@ -511,7 +556,7 @@ fun PricingCopyEditorScreen(
             Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 7.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            FilledTonalIconButton(onClick = onBack) {
+            FilledTonalIconButton(onClick = safeBack) {
                 Icon(Icons.Outlined.ArrowForward, "رجوع")
             }
             Spacer(Modifier.width(7.dp))
@@ -620,16 +665,7 @@ fun PricingCopyEditorScreen(
                     onPriceChange = { text ->
                         val current = lines[index]
                         lines[index] = current.copy(priceText = text)
-                        saveState = "جارٍ الحفظ..."
-                        scope.launch {
-                            repository.updatePricingCopyLine(
-                                copyId = copyId,
-                                requestLineId = current.detail.requestLineId,
-                                brand = current.brand,
-                                unitPrice = text.toDoubleOrNull(),
-                            )
-                            saveState = "تم الحفظ تلقائيًا ✓"
-                        }
+                        scheduleLineSave(current.detail.requestLineId)
                     },
                 )
             }
@@ -684,32 +720,16 @@ fun PricingCopyEditorScreen(
                 onSelect = { brand ->
                     val current = lines[index]
                     lines[index] = current.copy(brand = brand)
-                    saveState = "جارٍ الحفظ..."
-                    scope.launch {
-                        repository.updatePricingCopyLine(
-                            copyId = copyId,
-                            requestLineId = current.detail.requestLineId,
-                            brand = brand,
-                            unitPrice = current.priceText.toDoubleOrNull(),
-                        )
-                        saveState = "تم الحفظ تلقائيًا ✓"
-                    }
+                    scheduleLineSave(current.detail.requestLineId)
                     brandTargetIndex = null
                 },
                 onAdd = { brand ->
                     if (categoryId != null) {
-                        saveState = "جارٍ الحفظ..."
                         scope.launch {
                             repository.addCategoryBrand(categoryId, brand)
                             val current = lines[index]
                             lines[index] = current.copy(brand = brand)
-                            repository.updatePricingCopyLine(
-                                copyId = copyId,
-                                requestLineId = current.detail.requestLineId,
-                                brand = brand,
-                                unitPrice = current.priceText.toDoubleOrNull(),
-                            )
-                            saveState = "تم الحفظ تلقائيًا ✓"
+                            scheduleLineSave(current.detail.requestLineId)
                         }
                     }
                     brandTargetIndex = null
