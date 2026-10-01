@@ -286,6 +286,8 @@ data class SupplierPriceEntity(
     val priceDate: Long,
     val source: PriceSource,
     val sourceReference: String = "",
+    val brand: String = "",
+    val priceUnit: String = "",
     val notes: String = "",
     val createdAt: Long = System.currentTimeMillis(),
 )
