@@ -13,7 +13,14 @@ import java.io.ByteArrayInputStream
 
 class PriceListImportEngineTest {
     private val items = listOf(
-        ItemEntity(id = 1, code = "SW25", name = "سلك 2.5 مم", normalizedName = "سلك 2.5 مم", defaultUnit = "لفة"),
+        ItemEntity(
+            id = 1,
+            code = "SW25",
+            name = "H07V-K 450/750V 1×2.5 مم²",
+            marketName = "سلك نحاس شعر 2.5 مم²",
+            normalizedName = "h07v-k 450/750v 1×2.5 مم²",
+            defaultUnit = "لفة",
+        ),
         ItemEntity(id = 2, code = "P20", name = "خرطوم 20 مم", normalizedName = "خرطوم 20 مم", defaultUnit = "لفة"),
     )
 
@@ -38,7 +45,7 @@ class PriceListImportEngineTest {
         val data = TabularPriceData(
             sourceFileName = "test.csv",
             headers = listOf("item", "price"),
-            rows = listOf(listOf("سلك ٢٫٥ مم", "3100")),
+            rows = listOf(listOf("سلك نحاس شعر ٢٫٥ مم²", "3100")),
         )
         val candidates = PriceListImportEngine.buildCandidates(
             data,
@@ -46,6 +53,41 @@ class PriceListImportEngineTest {
             items,
         )
         assertEquals(ImportMatchKind.EXACT_NAME, candidates.single().matchKind)
+    }
+
+
+    @Test
+    fun matchesExistingItemByMarketName() {
+        val data = TabularPriceData(
+            sourceFileName = "market.csv",
+            headers = listOf("item", "price"),
+            rows = listOf(listOf("سلك نحاس شعر 2.5 مم²", "3100")),
+        )
+        val candidate = PriceListImportEngine.buildCandidates(
+            data,
+            ImportColumnMapping(itemNameColumn = 0, listPriceColumn = 1),
+            items,
+        ).single()
+
+        assertEquals(ImportMatchKind.EXACT_NAME, candidate.matchKind)
+        assertEquals(1L, candidate.matchedItemId)
+    }
+
+    @Test
+    fun warnsWhenSupplierPriceUnitDiffersFromCatalogUnit() {
+        val data = TabularPriceData(
+            sourceFileName = "units.csv",
+            headers = listOf("item", "unit", "price"),
+            rows = listOf(listOf("سلك نحاس شعر 2.5 مم²", "م", "35")),
+        )
+        val candidate = PriceListImportEngine.buildCandidates(
+            data,
+            ImportColumnMapping(itemNameColumn = 0, listPriceColumn = 2, unitColumn = 1),
+            items,
+        ).single()
+
+        assertEquals(ImportMatchKind.EXACT_NAME, candidate.matchKind)
+        assertTrue(candidate.validationMessage.contains("مختلفة"))
     }
 
     @Test
