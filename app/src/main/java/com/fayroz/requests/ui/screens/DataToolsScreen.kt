@@ -36,7 +36,7 @@ fun DataToolsScreen(
                 busy = true
                 val result = runCatching {
                     withContext(Dispatchers.IO) {
-                        context.contentResolver.openOutputStream(uri)?.use { repository.writeBackup(it) }
+                        context.contentResolver.openOutputStream(uri)?.use { repository.writeBackup(context, it) }
                             ?: error("تعذر فتح ملف النسخة الاحتياطية")
                     }
                 }
@@ -59,7 +59,7 @@ fun DataToolsScreen(
                 busy = true
                 val result = runCatching {
                     withContext(Dispatchers.IO) {
-                        context.contentResolver.openInputStream(uri)?.use { repository.restoreBackup(it) }
+                        context.contentResolver.openInputStream(uri)?.use { repository.restoreBackup(context, it) }
                             ?: error("تعذر فتح ملف النسخة")
                     }
                 }
@@ -90,7 +90,7 @@ fun DataToolsScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Icon(Icons.Outlined.Security, null)
-                Text("النسخة تشمل المشروعات والكشوف والأصناف والموردين وقوائم الأسعار ونسخ التسعير والماركات.")
+                Text("النسخة تشمل المشروعات والكشوف وصور الكشوف والأصناف والموردين وقوائم الأسعار ونسخ التسعير والماركات.")
                 Text(
                     "الاستعادة تستبدل البيانات الحالية بالكامل بالبيانات الموجودة داخل ملف النسخة.",
                     style = MaterialTheme.typography.bodySmall,
