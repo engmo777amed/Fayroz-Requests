@@ -53,6 +53,7 @@ object StarterCatalog {
         "أعمال خارجية",
         "مثبتات وإكسسوارات",
         "مواد لاصقة وكيماويات",
+        "عدد وأدوات",
         "مستهلكات موقع",
         "أخرى",
     )
@@ -165,6 +166,7 @@ object StarterCatalog {
         name.startsWith("Track Light") -> "سبوت تراك"
         name.startsWith("Driver") -> "درايفر"
         name.startsWith("Access Point") -> "أكسس بوينت"
+        name.startsWith("PIR Motion Sensor Smart") -> "حساس حركة سمارت"
         name.startsWith("Network Switch") -> "سويتش نتورك"
         name.startsWith("PoE Switch") -> "سويتش POE"
         name.startsWith("Patch Panel") -> "باتش بانل"
@@ -347,7 +349,7 @@ object StarterCatalog {
             "كاميرا Dome","كاميرا Bullet","كاميرا IP Dome","كاميرا IP Bullet","NVR 4 Channel","NVR 8 Channel","NVR 16 Channel",
             "HDD Surveillance 1TB","HDD Surveillance 2TB","HDD Surveillance 4TB","انتركم صوتي","انتركم مرئي",
             "جرس باب","قفل ذكي","Smart Switch 1 Gang","Smart Switch 2 Gang","Smart Switch 3 Gang","Smart Relay",
-            "Smart Dimmer","Smart Curtain Module","Smart Thermostat","Zigbee Hub","Matter Hub","حساس فتح باب","حساس حركة","حساس دخان","حساس تسريب مياه"
+            "Smart Dimmer","Smart Curtain Module","Smart Thermostat","Zigbee Hub","Matter Hub","حساس فتح باب","PIR Motion Sensor Smart","حساس دخان","حساس تسريب مياه"
         ).forEach { add(item("تيار خفيف وسمارت", it, if (it.startsWith("كابل")) "م" else "عدد")) }
 
         listOf("1/4","3/8","1/2","5/8","3/4","7/8","1 1/8").forEach { s ->
