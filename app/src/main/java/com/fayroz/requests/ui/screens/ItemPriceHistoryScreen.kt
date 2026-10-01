@@ -64,7 +64,13 @@ fun ItemPriceHistoryScreen(
                                 Text(historyMoney(row.netPrice), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
                             }
                             Text(
-                                "ليستة ${historyMoney(row.listPrice)} • خصم ${historyDiscount(row.appliedDiscountPercent)} • صافي الوحدة ${historyMoney(row.netPrice)}",
+                                buildString {
+                                    append("ليستة ").append(historyMoney(row.listPrice))
+                                    append(" / ").append(row.unit)
+                                    if (row.brand.isNotBlank()) append(" • ").append(row.brand)
+                                    append(" • خصم ").append(historyDiscount(row.appliedDiscountPercent))
+                                    append(" • صافي ").append(historyMoney(row.netPrice))
+                                },
                                 style = MaterialTheme.typography.bodySmall,
                             )
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
