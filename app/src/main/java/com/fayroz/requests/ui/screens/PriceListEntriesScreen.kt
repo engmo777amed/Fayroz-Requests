@@ -188,7 +188,7 @@ private fun PriceEntryDialog(
                 OutlinedButton(onClick = { if (initialEntry == null) showItemPicker = true }, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Outlined.Inventory2, null)
                     Spacer(Modifier.width(8.dp))
-                    Text(selectedItem?.name ?: "اختيار الصنف")
+                    Text(selectedItem?.let { it.marketName.ifBlank { it.name } } ?: "اختيار الصنف")
                 }
                 OutlinedTextField(
                     value = listPrice,
