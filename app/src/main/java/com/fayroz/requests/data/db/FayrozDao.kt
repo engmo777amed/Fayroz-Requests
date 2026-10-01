@@ -37,16 +37,32 @@ interface FayrozDao {
     @Query("UPDATE items SET categoryId = :categoryId WHERE categoryId IS NULL")
     suspend fun assignUncategorizedItems(categoryId: Long)
 
-    @Query("SELECT * FROM items ORDER BY marketName COLLATE NOCASE, name COLLATE NOCASE")
+    @Query("SELECT * FROM items WHERE active = 1 ORDER BY marketName COLLATE NOCASE, name COLLATE NOCASE")
     fun observeItems(): Flow<List<ItemEntity>>
 
-    @Query("SELECT * FROM items ORDER BY marketName COLLATE NOCASE, name COLLATE NOCASE")
+    @Query("SELECT * FROM items WHERE active = 1 ORDER BY marketName COLLATE NOCASE, name COLLATE NOCASE")
     suspend fun getItems(): List<ItemEntity>
 
-    @Query("SELECT COUNT(*) FROM items")
+    @Query("SELECT * FROM items ORDER BY marketName COLLATE NOCASE, name COLLATE NOCASE")
+    suspend fun getItemsIncludingInactive(): List<ItemEntity>
+
+    @Query("SELECT * FROM items WHERE categoryId = :categoryId ORDER BY id")
+    suspend fun getItemsByCategoryIncludingInactive(categoryId: Long): List<ItemEntity>
+
+    @Query("SELECT COUNT(*) FROM items WHERE active = 1")
     suspend fun countItems(): Int
 
-    @Query("SELECT * FROM items WHERE normalizedName LIKE '%' || :query || '%' OR marketName LIKE '%' || :query || '%' OR code LIKE '%' || :query || '%' ORDER BY marketName COLLATE NOCASE, name COLLATE NOCASE LIMIT 50")
+    @Query("""
+        SELECT * FROM items
+        WHERE active = 1
+          AND (
+            normalizedName LIKE '%' || :query || '%'
+            OR marketName LIKE '%' || :query || '%'
+            OR code LIKE '%' || :query || '%'
+          )
+        ORDER BY marketName COLLATE NOCASE, name COLLATE NOCASE
+        LIMIT 50
+    """)
     fun searchItems(query: String): Flow<List<ItemEntity>>
 
     @Query("SELECT * FROM items WHERE id = :itemId LIMIT 1")
@@ -63,6 +79,18 @@ interface FayrozDao {
 
     @Update suspend fun updateItem(item: ItemEntity)
     @Delete suspend fun deleteItem(item: ItemEntity)
+
+    @Query("UPDATE items SET active = 0 WHERE id = :itemId")
+    suspend fun archiveItem(itemId: Long)
+
+    @Query("UPDATE request_lines SET itemId = :masterItemId WHERE itemId = :duplicateItemId")
+    suspend fun relinkRequestLines(duplicateItemId: Long, masterItemId: Long)
+
+    @Query("UPDATE supplier_prices SET itemId = :masterItemId WHERE itemId = :duplicateItemId")
+    suspend fun relinkSupplierPrices(duplicateItemId: Long, masterItemId: Long)
+
+    @Query("UPDATE supplier_discount_rules SET itemId = :masterItemId WHERE itemId = :duplicateItemId")
+    suspend fun relinkItemDiscountRules(duplicateItemId: Long, masterItemId: Long)
 
     @Query("SELECT DISTINCT brand FROM request_lines WHERE TRIM(brand) != '' ORDER BY brand COLLATE NOCASE")
     fun observeRequestBrands(): Flow<List<String>>
@@ -300,6 +328,12 @@ interface FayrozDao {
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertCategoryBrand(brand: CategoryBrandEntity): Long
+
+    @Query("DELETE FROM category_brands WHERE name IN (:names)")
+    suspend fun deleteCategoryBrandsByNames(names: List<String>)
+
+    @Query("DELETE FROM category_brands WHERE categoryId = :categoryId AND name = :name COLLATE NOCASE")
+    suspend fun deleteCategoryBrandByName(categoryId: Long, name: String)
 
     @Query(
         """
