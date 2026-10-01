@@ -15,7 +15,7 @@ class FayrozRequestsApp : Application() {
         val marketNamesReady = prefs.getBoolean("market_names_v7_seeded", false)
         val catalogGovernanceReady = prefs.getBoolean("catalog_governance_v8_cleaned", false)
 
-        if (!catalogReady || !marketCatalogReady || !marketNamesReady || !repository.hasAnyItems()) {
+        if (!catalogReady || !marketCatalogReady || !marketNamesReady || !catalogGovernanceReady || !repository.hasAnyItems()) {
             repository.ensureStarterCatalog()
             prefs.edit()
                 .putBoolean("starter_catalog_v4_seeded", true)
