@@ -13,6 +13,7 @@ class FayrozRequestsApp : Application() {
         val catalogReady = prefs.getBoolean("starter_catalog_v4_seeded", false)
         val marketCatalogReady = prefs.getBoolean("market_catalog_v6_seeded", false)
         val marketNamesReady = prefs.getBoolean("market_names_v7_seeded", false)
+        val catalogGovernanceReady = prefs.getBoolean("catalog_governance_v8_cleaned", false)
 
         if (!catalogReady || !marketCatalogReady || !marketNamesReady || !repository.hasAnyItems()) {
             repository.ensureStarterCatalog()
@@ -25,5 +26,12 @@ class FayrozRequestsApp : Application() {
 
         // Idempotent: adds only missing company/brand names and preserves user additions.
         repository.ensureStarterBrands()
+
+        if (!catalogGovernanceReady) {
+            repository.ensureCatalogGovernance()
+            prefs.edit()
+                .putBoolean("catalog_governance_v8_cleaned", true)
+                .apply()
+        }
     }
 }
