@@ -71,6 +71,7 @@ data class ItemEntity(
     val defaultUnit: String,
     val brand: String = "",
     val specification: String = "",
+    val active: Boolean = true,
     val createdAt: Long = System.currentTimeMillis(),
 )
 
