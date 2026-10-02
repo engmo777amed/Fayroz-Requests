@@ -14,6 +14,7 @@ class FayrozRequestsApp : Application() {
         val marketCatalogReady = prefs.getBoolean("market_catalog_v6_seeded", false)
         val marketNamesReady = prefs.getBoolean("market_names_v7_seeded", false)
         val catalogGovernanceReady = prefs.getBoolean("catalog_governance_v8_cleaned", false)
+        val onlineMarketPricesReady = prefs.getBoolean("online_market_prices_v1_seeded", false)
 
         if (!catalogReady || !marketCatalogReady || !marketNamesReady || !catalogGovernanceReady || !repository.hasAnyItems()) {
             repository.ensureStarterCatalog()
@@ -31,6 +32,13 @@ class FayrozRequestsApp : Application() {
             repository.ensureCatalogGovernance()
             prefs.edit()
                 .putBoolean("catalog_governance_v8_cleaned", true)
+                .apply()
+        }
+
+        if (!onlineMarketPricesReady) {
+            repository.ensureOnlineMarketPrices()
+            prefs.edit()
+                .putBoolean("online_market_prices_v1_seeded", true)
                 .apply()
         }
     }
