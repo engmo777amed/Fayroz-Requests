@@ -611,6 +611,7 @@ class FayrozRepository(private val database: FayrozDatabase) {
         rememberAsItemDiscount: Boolean = false,
         brand: String = "",
         priceUnit: String = "",
+        sourceReference: String = "",
         notes: String = "",
     ): Long = database.withTransaction {
         val priceList = dao.getPriceList(priceListId) ?: error("قائمة الأسعار غير موجودة")
@@ -651,6 +652,7 @@ class FayrozRepository(private val database: FayrozDatabase) {
                     netPrice = netPrice,
                     priceDate = priceList.effectiveDate,
                     source = PriceSource.PRICE_LIST,
+                    sourceReference = sourceReference.trim(),
                     brand = brand.trim(),
                     priceUnit = priceUnit.trim().ifBlank { item.defaultUnit },
                     notes = notes.trim(),
@@ -663,6 +665,7 @@ class FayrozRepository(private val database: FayrozDatabase) {
                     appliedDiscountPercent = appliedDiscount,
                     netPrice = netPrice,
                     priceDate = priceList.effectiveDate,
+                    sourceReference = sourceReference.trim(),
                     brand = brand.trim(),
                     priceUnit = priceUnit.trim().ifBlank { item.defaultUnit },
                     notes = notes.trim(),
