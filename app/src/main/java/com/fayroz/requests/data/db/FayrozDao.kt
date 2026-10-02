@@ -264,6 +264,7 @@ interface FayrozDao {
                sp.netPrice AS netPrice,
                sp.priceDate AS priceDate,
                sp.source AS source,
+               sp.sourceReference AS sourceReference,
                sp.notes AS notes
         FROM supplier_prices sp
         INNER JOIN items i ON i.id = sp.itemId
