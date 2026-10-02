@@ -213,6 +213,9 @@ interface FayrozDao {
     @Query("SELECT * FROM price_lists WHERE supplierId = :supplierId AND sourceReference = :sourceReference LIMIT 1")
     suspend fun findPriceListBySourceReference(supplierId: Long, sourceReference: String): PriceListEntity?
 
+    @Query("SELECT * FROM price_lists WHERE supplierId = :supplierId AND name = :name AND effectiveDate = :effectiveDate LIMIT 1")
+    suspend fun findPriceListByNameAndDate(supplierId: Long, name: String, effectiveDate: Long): PriceListEntity?
+
     @Query(
         """
         SELECT pl.id AS id,
