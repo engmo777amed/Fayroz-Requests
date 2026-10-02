@@ -34,6 +34,8 @@ object OnlineMarketPriceSeed {
     private const val MAHGOUB_BANNINGER = "https://www.mahgoub.com/ar/%D8%A7%D9%84%D9%85%D8%B5%D8%A7%D9%86%D8%B9/%D8%A8%D8%A7%D9%86%D9%86%D8%AC%D8%B1/"
     private const val SCHNEIDER_ESHOP = "https://eshop.se.com/eg/"
     private const val ELECTRICITY_STORE_CABLES = "https://electricity-store.com/ar/product-category/electrical-materials-ar/%D8%A7%D9%84%D8%A3%D8%B3%D9%84%D8%A7%D9%83-%D9%88%D8%A7%D9%84%D9%83%D8%A7%D8%A8%D9%84%D8%A7%D8%AA-ar/"
+    private const val MAHGOUB_ELSHERIF = "https://www.mahgoub.com/ar/%D9%85%D8%B3%D8%AA%D9%84%D8%B2%D9%85%D8%A7%D8%AA/%D9%84%D9%88%D8%A7%D8%B2%D9%85-%D8%B3%D8%A8%D8%A7%D9%83%D8%A9/%D8%A7%D9%84%D8%B4%D8%B1%D9%8A%D9%81/"
+    private const val MAHGOUB_AQUATHERM = "https://www.mahgoub.com/ar/%D8%A7%D9%84%D9%85%D8%B5%D8%A7%D9%86%D8%B9/%D8%A3%D9%83%D9%88%D8%A7%D8%AB%D9%8A%D8%B1%D9%85/"
 
     val entries: List<Entry> = buildList {
         // Elsewedy — published 10/09/2026 on Elmahal / Samah Gibril.
@@ -402,6 +404,57 @@ object OnlineMarketPriceSeed {
             )
         }
 
+
+        // El Sherif — Mahgoub. Only exact PPR weld fittings mapped to existing master items.
+        listOf(
+            Triple("جلبة PPR 20 مم", 13.75, 13.75),
+            Triple("جلبة PPR 25 مم", 15.05, 15.05),
+            Triple("كوع PPR 25 مم", 18.45, 18.45),
+            Triple("تي PPR 25 مم", 25.21, 25.21),
+        ).forEach { (itemName, regular, sale) ->
+            add(
+                Entry(
+                    itemName = itemName,
+                    brand = "الشريف",
+                    supplierName = "Mahgoub",
+                    supplierSpecialty = "أدوات صحية ولوازم سباكة",
+                    listName = "Mahgoub الشريف - 02/10/2026",
+                    listSourceUrl = MAHGOUB_ELSHERIF,
+                    sourceUrl = MAHGOUB_ELSHERIF,
+                    priceDate = "2026-10-02",
+                    listPrice = regular,
+                    netPrice = sale,
+                    priceUnit = "عدد",
+                    notes = "الشريف • قطعة PPR لحام • السعر الظاهر بمحجوب وقت الفحص",
+                )
+            )
+        }
+
+        // Aquatherm — Mahgoub. Exact weld fittings only.
+        listOf(
+            Triple("جلبة PPR 20 مم", 36.73, 33.06),
+            Triple("جلبة PPR 25 مم", 50.96, 45.86),
+            Triple("كوع PPR 20 مم", 37.59, 33.83),
+            Triple("كوع PPR 25 مم", 62.10, 55.89),
+        ).forEach { (itemName, regular, sale) ->
+            add(
+                Entry(
+                    itemName = itemName,
+                    brand = "aquatherm",
+                    supplierName = "Mahgoub",
+                    supplierSpecialty = "أدوات صحية ولوازم سباكة",
+                    listName = "Mahgoub Aquatherm - 02/10/2026",
+                    listSourceUrl = MAHGOUB_AQUATHERM,
+                    sourceUrl = MAHGOUB_AQUATHERM,
+                    priceDate = "2026-10-02",
+                    listPrice = regular,
+                    netPrice = sale,
+                    priceUnit = "عدد",
+                    notes = "Aquatherm • قطعة PPR لحام • السعر الظاهر بمحجوب وقت الفحص",
+                )
+            )
+        }
+
         // Same BR fittings from Mahgoub to preserve supplier-to-supplier comparison.
         add(
             Entry(
@@ -462,7 +515,7 @@ object OnlineMarketPriceSeed {
                 sourceUrl = "https://www.mahgoub.com/ar/%D9%85%D8%B3%D8%AA%D9%84%D8%B2%D9%85%D8%A7%D8%AA/%D9%84%D9%88%D8%A7%D8%B2%D9%85-%D8%B3%D8%A8%D8%A7%D9%83%D8%A9/%D8%A8%D8%A7%D9%86%D9%86%D8%AC%D8%B1/%D8%AC%D9%84%D8%A8%D9%87-%D9%84%D8%AD%D8%A7%D9%85-%D8%A8%D9%88%D9%84%D9%89-%D8%A8%D8%B1%D9%88%D8%A8%D9%84%D9%8A%D9%86-4%2F3-%D8%A8%D9%88%D8%B5%D9%87-1610000427.html",
                 priceDate = "2026-10-02",
                 listPrice = 17.75,
-                netPrice = 16.70,
+                netPrice = 17.04,
                 priceUnit = "عدد",
                 notes = "Bänninger/BR • 3/4 بوصة ≈ 25 مم • كود 351070002 • بالقطعة",
             )
