@@ -91,6 +91,7 @@ data class ItemPriceHistoryDetail(
     val netPrice: Double,
     val priceDate: Long,
     val source: PriceSource,
+    val sourceReference: String,
     val notes: String,
 )
 
