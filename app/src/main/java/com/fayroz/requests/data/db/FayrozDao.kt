@@ -210,6 +210,9 @@ interface FayrozDao {
     @Query("SELECT * FROM price_lists WHERE id = :priceListId LIMIT 1")
     suspend fun getPriceList(priceListId: Long): PriceListEntity?
 
+    @Query("SELECT * FROM price_lists WHERE supplierId = :supplierId AND sourceReference = :sourceReference LIMIT 1")
+    suspend fun findPriceListBySourceReference(supplierId: Long, sourceReference: String): PriceListEntity?
+
     @Query(
         """
         SELECT pl.id AS id,
@@ -287,6 +290,7 @@ interface FayrozDao {
                sp.netPrice AS netPrice,
                sp.priceDate AS priceDate,
                sp.source AS source,
+               sp.sourceReference AS sourceReference,
                sp.notes AS notes
         FROM supplier_prices sp
         INNER JOIN suppliers s ON s.id = sp.supplierId
