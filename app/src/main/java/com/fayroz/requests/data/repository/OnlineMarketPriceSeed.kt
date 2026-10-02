@@ -33,6 +33,7 @@ object OnlineMarketPriceSeed {
     private const val TAWREDAAT_ELECTRICAL = "https://tawredaat.com/ar-eg/collections/electrical/new-ega"
     private const val MAHGOUB_BANNINGER = "https://www.mahgoub.com/ar/%D8%A7%D9%84%D9%85%D8%B5%D8%A7%D9%86%D8%B9/%D8%A8%D8%A7%D9%86%D9%86%D8%AC%D8%B1/"
     private const val SCHNEIDER_ESHOP = "https://eshop.se.com/eg/"
+    private const val ELECTRICITY_STORE_CABLES = "https://electricity-store.com/ar/product-category/electrical-materials-ar/%D8%A7%D9%84%D8%A3%D8%B3%D9%84%D8%A7%D9%83-%D9%88%D8%A7%D9%84%D9%83%D8%A7%D8%A8%D9%84%D8%A7%D8%AA-ar/"
 
     val entries: List<Entry> = buildList {
         // Elsewedy — published 10/09/2026 on Elmahal / Samah Gibril.
@@ -89,6 +90,71 @@ object OnlineMarketPriceSeed {
                     netPrice = price,
                     priceUnit = "لفة",
                     notes = "لفة 100 متر • شعر ناعم • السعر المنشور بدون بيان واضح للضريبة أو الشحن",
+                )
+            )
+        }
+
+
+        // Egyptian Cables — Electricity Store, 100 m rolls.
+        val egyptianCablesStranded = mapOf(
+            "1.5" to 886.70,
+            "2" to 1175.00,
+            "2.5" to 1425.20,
+            "3" to 1698.00,
+            "4" to 2197.00,
+            "6" to 3291.30,
+            "10" to 5383.50,
+            "16" to 8582.70,
+            "25" to 15446.20,
+            "35" to 20944.00,
+        )
+        val egyptianCablesFlexible = mapOf(
+            "1.5" to 1005.90,
+            "2" to 1329.20,
+            "2.5" to 1630.90,
+            "3" to 1900.90,
+            "4" to 2492.80,
+            "6" to 3664.90,
+            "10" to 6458.80,
+            "16" to 10147.20,
+            "25" to 18587.80,
+            "35" to 25918.20,
+        )
+        egyptianCablesStranded.forEach { (section, price) ->
+            add(
+                Entry(
+                    itemName = "H07V-R 450/750V 1×$section مم²",
+                    brand = "الكابلات المصرية",
+                    supplierName = "Electricity Store",
+                    supplierSpecialty = "توريدات كهربائية",
+                    listName = "Electricity Store - الكابلات المصرية - 02/10/2026",
+                    listSourceUrl = ELECTRICITY_STORE_CABLES,
+                    sourceUrl = if (section == "2.5") {
+                        "https://electricity-store.com/ar/product/%D8%A7%D9%84%D9%83%D8%A7%D8%A8%D9%84%D8%A7%D8%AA-%D8%A7%D9%84%D9%85%D8%B5%D8%B1%D9%8A%D8%A9-%D8%B3%D9%84%D9%83-%D9%83%D9%87%D8%B1%D8%A8%D8%A7%D8%A1-%D9%86%D8%AD%D8%A7%D8%B3-%D9%85%D8%B5%D9%85%D8%AA-10/"
+                    } else ELECTRICITY_STORE_CABLES,
+                    priceDate = "2026-10-02",
+                    listPrice = price,
+                    netPrice = price,
+                    priceUnit = "لفة",
+                    notes = "لفة 100 متر • السعر الظاهر بالموقع وقت الفحص • لا يوجد بيان واضح للضريبة أو الشحن",
+                )
+            )
+        }
+        egyptianCablesFlexible.forEach { (section, price) ->
+            add(
+                Entry(
+                    itemName = "H07V-K 450/750V 1×$section مم²",
+                    brand = "الكابلات المصرية",
+                    supplierName = "Electricity Store",
+                    supplierSpecialty = "توريدات كهربائية",
+                    listName = "Electricity Store - الكابلات المصرية - 02/10/2026",
+                    listSourceUrl = ELECTRICITY_STORE_CABLES,
+                    sourceUrl = ELECTRICITY_STORE_CABLES,
+                    priceDate = "2026-10-02",
+                    listPrice = price,
+                    netPrice = price,
+                    priceUnit = "لفة",
+                    notes = "لفة 100 متر • نحاس شعر • السعر الظاهر بالموقع وقت الفحص • لا يوجد بيان واضح للضريبة أو الشحن",
                 )
             )
         }
@@ -195,6 +261,72 @@ object OnlineMarketPriceSeed {
             )
         )
 
+
+        add(
+            Entry(
+                itemName = "جلبة ماسورة كهرباء 20 مم",
+                brand = "New Ega",
+                supplierName = "Tawredaat",
+                supplierSpecialty = "توريدات مواد بناء وتشطيب B2B",
+                listName = "Tawredaat كهرباء - 02/10/2026",
+                listSourceUrl = TAWREDAAT_ELECTRICAL,
+                sourceUrl = "https://tawredaat.com/en-eg/products/coupler-20-mm-new-ega",
+                priceDate = "2026-10-02",
+                listPrice = 2.87,
+                netPrice = 2.26,
+                priceUnit = "عدد",
+                notes = "New Ega • كود NGE/C20 • السعر المنشور على توريدات",
+            )
+        )
+        add(
+            Entry(
+                itemName = "كلبسة ماسورة كهرباء 20 مم",
+                brand = "New Ega",
+                supplierName = "Tawredaat",
+                supplierSpecialty = "توريدات مواد بناء وتشطيب B2B",
+                listName = "Tawredaat كهرباء - 02/10/2026",
+                listSourceUrl = TAWREDAAT_ELECTRICAL,
+                sourceUrl = "https://tawredaat.com/en-eg/products/clip-saddle-20mm-new-ega",
+                priceDate = "2026-10-02",
+                listPrice = 2.07,
+                netPrice = 1.63,
+                priceUnit = "عدد",
+                notes = "New Ega • كود NGS/S20 • كلبسة PVC • السعر المنشور على توريدات",
+            )
+        )
+        add(
+            Entry(
+                itemName = "كلبسة ماسورة كهرباء 40 مم",
+                brand = "New Ega",
+                supplierName = "Tawredaat",
+                supplierSpecialty = "توريدات مواد بناء وتشطيب B2B",
+                listName = "Tawredaat كهرباء - 02/10/2026",
+                listSourceUrl = TAWREDAAT_ELECTRICAL,
+                sourceUrl = "https://tawredaat.com/en-eg/products/clip-saddle-40mm-new-ega",
+                priceDate = "2026-10-02",
+                listPrice = 3.75,
+                netPrice = 3.11,
+                priceUnit = "عدد",
+                notes = "New Ega • كود NGS/S40 • كلبسة PVC • السعر المنشور على توريدات",
+            )
+        )
+        add(
+            Entry(
+                itemName = "كوع ماسورة كهرباء 40 مم",
+                brand = "New Ega",
+                supplierName = "Tawredaat",
+                supplierSpecialty = "توريدات مواد بناء وتشطيب B2B",
+                listName = "Tawredaat كهرباء - 02/10/2026",
+                listSourceUrl = TAWREDAAT_ELECTRICAL,
+                sourceUrl = "https://tawredaat.com/ar-eg/products/bend-round-conduit-40-mm-new-ega",
+                priceDate = "2026-10-02",
+                listPrice = 19.95,
+                netPrice = 15.68,
+                priceUnit = "عدد",
+                notes = "New Ega • كود NGD/B40 • السعر المنشور على توريدات",
+            )
+        )
+
         // BR / Bänninger PPR fittings — only fittings with unambiguous size/type.
         add(
             Entry(
@@ -244,6 +376,31 @@ object OnlineMarketPriceSeed {
                 notes = "BR/Bänninger • تي لحام 90° أخضر • كود 351050003",
             )
         )
+
+
+        listOf(
+            Triple("20", 18.50, 16.42),
+            Triple("40", 85.00, 75.43),
+            Triple("50", 136.25, 120.91),
+            Triple("63", 196.50, 174.37),
+        ).forEach { (size, regular, sale) ->
+            add(
+                Entry(
+                    itemName = "تي PPR $size مم",
+                    brand = "BR",
+                    supplierName = "Tawredaat",
+                    supplierSpecialty = "توريدات مواد بناء وتشطيب B2B",
+                    listName = "Tawredaat سباكة BR - 02/10/2026",
+                    listSourceUrl = TAWREDAAT_PPR,
+                    sourceUrl = "https://tawredaat.com/ar-eg/collections/water-fittings/br?page=18",
+                    priceDate = "2026-10-02",
+                    listPrice = regular,
+                    netPrice = sale,
+                    priceUnit = "عدد",
+                    notes = "BR/Bänninger • تي لحام 90° أخضر • السعر المنشور على توريدات",
+                )
+            )
+        }
 
         // Same BR fittings from Mahgoub to preserve supplier-to-supplier comparison.
         add(
