@@ -8,6 +8,8 @@ import com.fayroz.requests.data.model.*
 import com.fayroz.requests.domain.PricingEngine
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import java.time.LocalDate
+import java.time.ZoneId
 import java.util.Locale
 import java.util.UUID
 
@@ -308,6 +310,69 @@ class FayrozRepository(private val database: FayrozDatabase) {
         }
         dao.deleteItem(item)
         return null
+    }
+
+    suspend fun ensureOnlineMarketPrices(): Int {
+        val suppliers = dao.getSuppliers().toMutableList()
+        val listCache = mutableMapOf<Triple<Long, String, Long>, Long>()
+        var saved = 0
+
+        for (seed in OnlineMarketPriceSeed.entries) {
+            val item = dao.findItemByNormalizedName(ImportText.normalizeItemName(seed.itemName))
+                ?: continue
+
+            var supplier = suppliers.firstOrNull { it.name.equals(seed.supplierName, ignoreCase = true) }
+            if (supplier == null) {
+                val id = dao.insertSupplier(
+                    SupplierEntity(
+                        name = seed.supplierName,
+                        specialty = seed.supplierSpecialty,
+                        approved = true,
+                        notes = "مورد أضيف تلقائيًا من مصدر سعر منشور على الإنترنت",
+                    )
+                )
+                supplier = SupplierEntity(
+                    id = id,
+                    name = seed.supplierName,
+                    specialty = seed.supplierSpecialty,
+                    approved = true,
+                    notes = "مورد أضيف تلقائيًا من مصدر سعر منشور على الإنترنت",
+                )
+                suppliers += supplier
+            }
+
+            val effectiveDate = LocalDate.parse(seed.priceDate)
+                .atStartOfDay(ZoneId.of("Africa/Cairo"))
+                .toInstant()
+                .toEpochMilli()
+            val key = Triple(supplier.id, seed.listName, effectiveDate)
+            val priceListId = listCache[key] ?: run {
+                val existing = dao.findPriceListByNameAndDate(supplier.id, seed.listName, effectiveDate)
+                val id = existing?.id ?: dao.insertPriceList(
+                    PriceListEntity(
+                        supplierId = supplier.id,
+                        name = seed.listName,
+                        effectiveDate = effectiveDate,
+                        sourceReference = seed.listSourceUrl,
+                    )
+                )
+                listCache[key] = id
+                id
+            }
+
+            upsertPriceListEntry(
+                priceListId = priceListId,
+                itemId = item.id,
+                listPrice = seed.listPrice,
+                discountPercent = seed.discountPercent,
+                brand = seed.brand,
+                priceUnit = seed.priceUnit,
+                sourceReference = seed.sourceUrl,
+                notes = seed.notes,
+            )
+            saved++
+        }
+        return saved
     }
 
     suspend fun addSupplier(
