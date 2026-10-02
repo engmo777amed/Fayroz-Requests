@@ -98,6 +98,7 @@ object BrandCatalog {
         ),
         "كهرباء - تأسيس" to listOf(
             "Elsewedy Cables",
+            "الكابلات المصرية",
             "Kabelmetal",
             "El Nasr Cables",
             "Misr El-Hegaz",
