@@ -101,6 +101,7 @@ object BrandCatalog {
             "Kabelmetal",
             "El Nasr Cables",
             "Misr El-Hegaz",
+            "New Ega",
             "3M",
         ),
         "كهرباء - لوحات وحماية" to listOf(
